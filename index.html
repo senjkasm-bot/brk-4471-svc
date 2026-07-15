@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a1d27">
+<title>Arbeitstagebuch</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --accent: #4f7cff;
+    --text: #e8eaf0;
+    --text-muted: #7a809e;
+    --green: #06d6a0;
+    --orange: #f4a261;
+    --red: #ef476f;
+    --yellow: #ffd166;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-title { font-size: 18px; font-weight: 600; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .header-date { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-muted); }
+
+  .export-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .export-btn:hover { border-color: var(--green); color: var(--green); }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+  .main { padding: 16px; max-width: 600px; margin: 0 auto; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid var(--green);
+    color: var(--green);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 999;
+    transition: transform 0.3s ease;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* TODAY BANNER */
+  .today-banner {
+    background: linear-gradient(135deg, rgba(79,124,255,0.15), rgba(6,214,160,0.08));
+    border: 1px solid rgba(79,124,255,0.3);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+  .today-banner-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .today-banner-title { font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: 0.5px; }
+  .today-banner-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); background: var(--surface2); padding: 2px 8px; border-radius: 10px; }
+  .today-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .today-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .today-item-cat { font-size: 11px; padding: 2px 6px; border-radius: 5px; flex-shrink: 0; font-weight: 600; }
+  .today-item-text { color: var(--text); line-height: 1.4; flex: 1; }
+  .today-empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 8px 0; }
+
+  /* FORM */
+  .new-entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
+    transition: border-color 0.3s;
+  }
+  .card-label { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; }
+
+  .select-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  select {
+    flex: 1;
+    min-width: 140px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a809e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+  select:focus { border-color: var(--accent); }
+
+  .date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .date-label { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+  input[type="date"] { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; color-scheme: dark; }
+  input[type="date"]:focus { border-color: var(--accent); }
+  .date-clear { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  .date-clear:hover { border-color: var(--red); color: var(--red); }
+
+  .reminder-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .reminder-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-muted); user-select: none; }
+  .reminder-toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  input[type="time"] { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 10px; font-family: 'DM Mono', monospace; font-size: 14px; outline: none; color-scheme: dark; display: none; }
+  input[type="time"].visible { display: block; }
+  input[type="time"]:focus { border-color: var(--accent); }
+
+  .text-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; resize: none; min-height: 80px; outline: none; transition: border-color 0.2s; margin-bottom: 12px; }
+  .text-input:focus { border-color: var(--accent); }
+  .text-input::placeholder { color: var(--text-muted); }
+
+  .recording-bar { display: none; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(239,71,111,0.1); border: 1px solid var(--red); border-radius: 8px; margin-bottom: 12px; font-size: 13px; color: var(--red); }
+  .recording-bar.active { display: flex; }
+  .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
+
+  .action-row { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .btn-mic { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+  .btn-mic:hover { border-color: var(--red); color: var(--red); }
+  .btn-mic.recording { background: var(--red); color: white; border-color: var(--red); }
+  .btn-save { background: var(--accent); color: white; flex: 2; }
+  .btn-save:hover { opacity: 0.85; }
+  .btn-cancel { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
+  .btn-cancel:hover { border-color: var(--red); color: var(--red); }
+
+  /* ENTRIES */
+  .entries-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .entries-title { font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.5px; }
+  .entries-count { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-muted); background: var(--surface2); padding: 2px 8px; border-radius: 10px; }
+
+  .entry { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; animation: slideIn 0.3s ease; transition: border-color 0.2s; }
+  .entry:hover { border-color: var(--accent); }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  .entry-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .entry-cat { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
+  .entry-subcat { font-size: 11px; color: var(--text-muted); padding: 3px 8px; border-radius: 6px; background: var(--surface2); }
+  .entry-due { font-family: 'DM Mono', monospace; font-size: 11px; padding: 3px 8px; border-radius: 6px; background: rgba(255,209,102,0.12); color: var(--yellow); }
+  .entry-due.today { background: rgba(6,214,160,0.12); color: var(--green); }
+  .entry-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .entry-reminder-badge { font-size: 11px; color: var(--orange); }
+  .entry-text { font-size: 14px; line-height: 1.5; }
+  .entry-footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+  .btn-edit { background: none; border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 6px; transition: all 0.2s; }
+  .btn-edit:hover { border-color: var(--orange); color: var(--orange); }
+  .btn-delete { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 6px; transition: all 0.2s; }
+  .btn-delete:hover { color: var(--red); background: rgba(239,71,111,0.1); }
+  .btn-done { background: none; border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 6px; transition: all 0.2s; }
+  .btn-done:hover { border-color: var(--green); color: var(--green); }
+  .entry.done { opacity: 0.5; border-color: var(--green) !important; }
+  .entry.done .entry-text { text-decoration: line-through; color: var(--text-muted); }
+  .done-badge { font-size: 11px; color: var(--green); font-weight: 600; }
+
+  .empty { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-text { font-size: 14px; }
+
+  .cat-0 { background: rgba(79,124,255,0.15); color: #4f7cff; }
+  .cat-1 { background: rgba(6,214,160,0.15); color: #06d6a0; }
+  .cat-2 { background: rgba(244,162,97,0.15); color: #f4a261; }
+  .cat-3 { background: rgba(255,209,102,0.15); color: #ffd166; }
+  .cat-4 { background: rgba(239,71,111,0.15); color: #ef476f; }
+
+  /* IMPORT hidden input */
+  #importInput { display: none; }
+
+  /* CLAUDE AI BUTTON */
+  .btn-ai { background: linear-gradient(135deg, #4f7cff, #7c4fff); color: white; border: none; }
+  .btn-ai:hover { opacity: 0.85; }
+  .btn-ai.loading { opacity: 0.6; cursor: not-allowed; }
+
+  /* API KEY MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+    width: 100%;
+    max-width: 420px;
+  }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .modal-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5; }
+  .modal-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px;
+    border-radius: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    margin-bottom: 12px;
+  }
+  .modal-input:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 8px; }
+  .modal-save { flex: 2; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .modal-cancel { flex: 1; padding: 12px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 10px; font-size: 14px; cursor: pointer; }
+
+  /* AI RESULT PREVIEW */
+  .ai-preview {
+    display: none;
+    background: rgba(79,124,255,0.08);
+    border: 1px solid rgba(79,124,255,0.3);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .ai-preview.visible { display: block; }
+  .ai-preview-label { font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.5px; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- API KEY MODAL -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <div class="modal-title">🔑 Claude API-Schlüssel</div>
+    <div class="modal-desc">Gib deinen Anthropic API-Schlüssel ein. Er wird nur in deinem Browser gespeichert und nirgendwo übertragen.</div>
+    <input class="modal-input" type="password" id="apiKeyInput" placeholder="sk-ant-api03-...">
+    <div class="modal-btns">
+      <button class="modal-save" onclick="saveApiKey()">Speichern</button>
+      <button class="modal-cancel" onclick="closeApiModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-title">📋 Arbeitstagebuch</div>
+  <div class="header-right">
+    <button class="export-btn" onclick="exportData()">⬇ Export</button>
+    <label class="export-btn" style="cursor:pointer">⬆ Import<input type="file" id="importInput" accept=".json" onchange="importData(event)"></label>
+    <button class="export-btn" onclick="exportPDF()" style="color:#ef476f;border-color:#2e3350">📄 PDF</button>
+    <div class="header-date" id="headerDate"></div>
+  </div>
+</div>
+
+<div class="tabs" id="tabsContainer"></div>
+
+<div class="main">
+  <div class="today-banner">
+    <div class="today-banner-header">
+      <div class="today-banner-title">📅 Heute fällig</div>
+      <div class="today-banner-count" id="todayCount">0</div>
+    </div>
+    <div id="todayList"></div>
+  </div>
+
+  <div class="new-entry-card" id="newEntryCard">
+    <div class="card-label" id="formLabel">Neue Notiz</div>
+    <div class="select-row">
+      <select id="catSelect" onchange="updateSubcats()"></select>
+      <select id="subcatSelect"><option value="">— kein Unterpunkt —</option></select>
+    </div>
+    <div class="date-row">
+      <span class="date-label">📅 Datum:</span>
+      <input type="date" id="dateInput">
+      <button class="date-clear" onclick="clearDate()">Kein</button>
+    </div>
+    <div class="reminder-row">
+      <label class="reminder-toggle">
+        <input type="checkbox" id="reminderCheck" onchange="toggleReminderTime()">
+        🔔 Erinnerung
+      </label>
+      <input type="time" id="reminderTime">
+    </div>
+    <div class="recording-bar" id="recordingBar">
+      <div class="rec-dot"></div>
+      <span>Aufnahme läuft...</span>
+    </div>
+    <textarea class="text-input" id="noteText" placeholder="Notiz eingeben oder Mikrofon benutzen..."></textarea>
+    <div class="ai-preview" id="aiPreview">
+      <div class="ai-preview-label">🤖 CLAUDE VORSCHLAG</div>
+      <div id="aiPreviewText"></div>
+    </div>
+    <div class="action-row">
+      <button class="btn btn-mic" id="micBtn" onclick="toggleRecording()">🎤 Mikro</button>
+      <button class="btn btn-ai" id="aiBtn" onclick="runClaude()">🤖 Claude</button>
+      <button class="btn btn-save" id="saveBtn" onclick="saveEntry()">✓ Speichern</button>
+      <button class="btn btn-cancel" id="cancelBtn" onclick="cancelEdit()" style="display:none">✕</button>
+    </div>
+  </div>
+
+  <div class="entries-header">
+    <div class="entries-title">ALLE NOTIZEN</div>
+    <div class="entries-count" id="entriesCount">0</div>
+  </div>
+  <div id="entriesList"></div>
+</div>
+
+<script>
+const CATEGORIES = [
+  { name: "Kurzfristige Fragen", icon: "❓", colorClass: "cat-4", subs: [] },
+  { name: "Aufgaben", icon: "📌", colorClass: "cat-0", subs: ["🔴 Dringend", "🟡 In Kürze", "🟢 Für die Zukunft"] },
+  { name: "LKW-Planung", icon: "🚛", colorClass: "cat-1", subs: ["🔴 Dringend", "🟡 In Kürze", "🟢 Für die Zukunft"] },
+  { name: "Fertigstellungspflege", icon: "🌿", colorClass: "cat-2", subs: ["📋 Anmelden", "📋 Abmelden", "⚠️ Beschwerden", "❓ Anfragen"] },
+  { name: "Kleine Aufträge", icon: "🔧", colorClass: "cat-3", subs: ["✅ Kann sofort gemacht werden", "📦 Ersatzteile — Bestellt", "🛒 Ersatzteile — Muss bestellt werden", "💶 Kann abgerechnet werden", "📅 Klärungstermin"] }
+];
+
+let entries = [];
+let activeFilter = 'all';
+let recognition = null;
+let isRecording = false;
+let editingId = null;
+const todayStr = new Date().toISOString().split('T')[0];
+
+// ── IndexedDB ──────────────────────────────────────────────
+const DB_NAME = 'ArbeitstagebuchDB';
+const DB_VERSION = 1;
+const STORE = 'entries';
+let db;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE)) {
+        d.createObjectStore(STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbGetAll() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => resolve(req.result.sort((a,b) => b.id - a.id));
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbPut(entry) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).put(entry);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbDelete(id) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbClear() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ── INIT ──────────────────────────────────────────────────
+async function init() {
+  await openDB();
+  entries = await dbGetAll();
+
+  const now = new Date();
+  document.getElementById('headerDate').textContent =
+    now.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  document.getElementById('dateInput').value = todayStr;
+
+  const catSelect = document.getElementById('catSelect');
+  CATEGORIES.forEach((cat, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = cat.icon + ' ' + cat.name;
+    catSelect.appendChild(opt);
+  });
+
+  updateSubcats();
+  buildTabs();
+  renderToday();
+  renderEntries();
+
+  if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  scheduleAllReminders();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+  }
+}
+
+// ── FORM ──────────────────────────────────────────────────
+function updateSubcats() {
+  const catIdx = parseInt(document.getElementById('catSelect').value);
+  const subcatSelect = document.getElementById('subcatSelect');
+  subcatSelect.innerHTML = '<option value="">— kein Unterpunkt —</option>';
+  const cat = CATEGORIES[catIdx];
+  if (cat && cat.subs.length > 0) {
+    cat.subs.forEach(sub => {
+      const opt = document.createElement('option');
+      opt.value = sub; opt.textContent = sub;
+      subcatSelect.appendChild(opt);
+    });
+  }
+}
+
+function clearDate() { document.getElementById('dateInput').value = ''; }
+
+function toggleReminderTime() {
+  const checked = document.getElementById('reminderCheck').checked;
+  const t = document.getElementById('reminderTime');
+  if (checked) {
+    t.classList.add('visible');
+    const now = new Date(); now.setHours(now.getHours() + 1);
+    t.value = now.toTimeString().slice(0,5);
+  } else {
+    t.classList.remove('visible');
+    t.value = '';
+  }
+}
+
+function buildTabs() {
+  const container = document.getElementById('tabsContainer');
+  container.innerHTML = '';
+  const allTab = document.createElement('button');
+  allTab.className = 'tab' + (activeFilter === 'all' ? ' active' : '');
+  allTab.textContent = '📋 Alle';
+  allTab.onclick = () => { activeFilter = 'all'; buildTabs(); renderEntries(); };
+  container.appendChild(allTab);
+  CATEGORIES.forEach((cat, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (activeFilter === i ? ' active' : '');
+    btn.textContent = cat.icon + ' ' + cat.name;
+    btn.onclick = () => { activeFilter = i; buildTabs(); renderEntries(); };
+    container.appendChild(btn);
+  });
+}
+
+function renderToday() {
+  const todayEntries = entries.filter(e => e.dueDate === todayStr);
+  document.getElementById('todayCount').textContent = todayEntries.length;
+  const list = document.getElementById('todayList');
+  if (todayEntries.length === 0) {
+    list.innerHTML = '<div class="today-empty">Keine Aufgaben für heute 🎉</div>';
+    return;
+  }
+  list.innerHTML = todayEntries.map(e => `
+    <div class="today-item">
+      <span class="today-item-cat ${e.catColor}">${e.catIcon}</span>
+      <span class="today-item-text"><strong>${e.catName}</strong>${e.subcat ? ' · ' + e.subcat : ''}<br>${e.text}</span>
+      ${e.reminderTime ? `<span style="font-size:12px;color:var(--orange)">🔔 ${e.reminderTime}</span>` : ''}
+    </div>`).join('');
+}
+
+async function saveEntry() {
+  const text = document.getElementById('noteText').value.trim();
+  if (!text) return;
+  const catIdx = parseInt(document.getElementById('catSelect').value);
+  const cat = CATEGORIES[catIdx];
+  const dueDate = document.getElementById('dateInput').value || null;
+  const reminderEnabled = document.getElementById('reminderCheck').checked;
+  const reminderTime = reminderEnabled ? document.getElementById('reminderTime').value : null;
+  const subcat = document.getElementById('subcatSelect').value;
+
+  if (editingId !== null) {
+    const idx = entries.findIndex(e => e.id === editingId);
+    if (idx !== -1) {
+      entries[idx] = { ...entries[idx], catIdx, catName: cat.name, catIcon: cat.icon, catColor: cat.colorClass, subcat, text, dueDate, reminderTime, editedAt: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) };
+      await dbPut(entries[idx]);
+    }
+    editingId = null;
+    document.getElementById('formLabel').textContent = 'Neue Notiz';
+    document.getElementById('cancelBtn').style.display = 'none';
+    document.getElementById('saveBtn').textContent = '✓ Speichern';
+    document.getElementById('newEntryCard').style.borderColor = '';
+    showToast('✏️ Notiz aktualisiert');
+  } else {
+    const entry = {
+      id: Date.now(),
+      catIdx, catName: cat.name, catIcon: cat.icon, catColor: cat.colorClass,
+      subcat, text, dueDate, reminderTime,
+      createdAt: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+      createdDate: new Date().toLocaleDateString('de-DE')
+    };
+    entries.unshift(entry);
+    await dbPut(entry);
+    if (reminderTime && dueDate) scheduleReminder(entry);
+    showToast('✅ Gespeichert');
+  }
+
+  resetForm();
+  renderToday();
+  renderEntries();
+}
+
+function resetFormOld_DISABLED() {}
+
+function startEdit(id) {
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return;
+  editingId = id;
+  document.getElementById('catSelect').value = entry.catIdx;
+  updateSubcats();
+  setTimeout(() => { document.getElementById('subcatSelect').value = entry.subcat || ''; }, 50);
+  document.getElementById('noteText').value = entry.text;
+  document.getElementById('dateInput').value = entry.dueDate || '';
+  if (entry.reminderTime) {
+    document.getElementById('reminderCheck').checked = true;
+    document.getElementById('reminderTime').value = entry.reminderTime;
+    document.getElementById('reminderTime').classList.add('visible');
+  }
+  document.getElementById('formLabel').textContent = '✏️ Notiz bearbeiten';
+  document.getElementById('saveBtn').textContent = '✓ Aktualisieren';
+  document.getElementById('cancelBtn').style.display = 'flex';
+  document.getElementById('newEntryCard').style.borderColor = 'var(--orange)';
+  document.getElementById('newEntryCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('formLabel').textContent = 'Neue Notiz';
+  document.getElementById('cancelBtn').style.display = 'none';
+  document.getElementById('saveBtn').textContent = '✓ Speichern';
+  document.getElementById('newEntryCard').style.borderColor = '';
+  resetForm();
+}
+
+async function deleteEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  await dbDelete(id);
+  renderToday();
+  renderEntries();
+  showToast('🗑 Gelöscht');
+}
+
+function formatDueDate(dateStr) {
+  if (!dateStr) return null;
+  if (dateStr === todayStr) return 'Heute';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+}
+
+function renderEntries() {
+  const list = document.getElementById('entriesList');
+  const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.catIdx === activeFilter);
+  document.getElementById('entriesCount').textContent = filtered.length;
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Noch keine Einträge</div></div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(e => {
+    const due = formatDueDate(e.dueDate);
+    const isToday = e.dueDate === todayStr;
+    return `<div class="entry ${e.done ? 'done' : ''}">
+      <div class="entry-meta">
+        <span class="entry-cat ${e.catColor}">${e.catIcon} ${e.catName}</span>
+        ${e.subcat ? `<span class="entry-subcat">${e.subcat}</span>` : ''}
+        ${due ? `<span class="entry-due ${isToday ? 'today' : ''}">📅 ${due}</span>` : ''}
+        ${e.reminderTime ? `<span class="entry-reminder-badge">🔔 ${e.reminderTime}</span>` : ''}
+        ${e.done ? `<span class="done-badge">✓ Erledigt</span>` : ''}
+        <span class="entry-time">${e.createdDate} ${e.createdAt}${e.editedAt ? ' ✏️' : ''}</span>
+      </div>
+      <div class="entry-text">${e.text}</div>
+      <div class="entry-footer">
+        <button class="btn-done" onclick="toggleDone(${e.id})">${e.done ? '↩ Offen' : '✓ Erledigt'}</button>
+        <button class="btn-edit" onclick="startEdit(${e.id})">✏️ Bearbeiten</button>
+        <button class="btn-delete" onclick="deleteEntry(${e.id})">🗑 Löschen</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleDone(id) {
+  const idx = entries.findIndex(e => e.id === id);
+  if (idx === -1) return;
+  entries[idx].done = !entries[idx].done;
+  await dbPut(entries[idx]);
+  renderToday();
+  renderEntries();
+  showToast(entries[idx].done ? '✓ Erledigt' : '↩ Wieder offen');
+}
+
+// ── EXPORT / IMPORT ───────────────────────────────────────
+function exportData() {
+  const data = JSON.stringify(entries, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'arbeitstagebuch_' + todayStr + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('⬇ Export erfolgreich');
+}
+
+async function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  try {
+    const imported = JSON.parse(text);
+    if (!Array.isArray(imported)) throw new Error();
+    await dbClear();
+    entries = imported;
+    for (const e of entries) await dbPut(e);
+    renderToday();
+    renderEntries();
+    showToast('⬆ Import erfolgreich: ' + imported.length + ' Einträge');
+  } catch {
+    showToast('❌ Fehler beim Import');
+  }
+  event.target.value = '';
+}
+
+// ── TOAST ─────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── PDF EXPORT ────────────────────────────────────────────
+function exportPDF() {
+  const now = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.catIdx === activeFilter);
+
+  const rows = filtered.map(e => {
+    const due = e.dueDate ? (e.dueDate === todayStr ? 'Heute' : new Date(e.dueDate).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit'})) : '';
+    const status = e.done ? '✓' : '○';
+    return `<tr class="${e.done ? 'done-row' : ''}">
+      <td>${status}</td>
+      <td>${e.catIcon} ${e.catName}${e.subcat ? '<br><small>' + e.subcat + '</small>' : ''}</td>
+      <td>${e.text}</td>
+      <td>${due}</td>
+      <td>${e.reminderTime || ''}</td>
+      <td>${e.createdDate}<br><small>${e.createdAt}</small></td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Arbeitstagebuch — ${now}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #222; margin: 20px; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 12px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #1a1d27; color: white; padding: 8px; text-align: left; font-size: 11px; }
+  td { padding: 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  tr:hover td { background: #f5f5f5; }
+  .done-row td { color: #999; text-decoration: line-through; }
+  small { color: #888; font-size: 10px; }
+  @media print { button { display: none; } }
+</style>
+</head>
+<body>
+<h1>📋 Arbeitstagebuch</h1>
+<div class="subtitle">Erstellt am ${now} · ${filtered.length} Einträge</div>
+<button onclick="window.print()" style="margin-bottom:12px;padding:8px 16px;background:#4f7cff;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨 Drucken / Als PDF speichern</button>
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Kategorie</th>
+      <th>Notiz</th>
+      <th>Datum</th>
+      <th>Erinnerung</th>
+      <th>Erstellt</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📄 PDF-Ansicht geöffnet');
+}
+
+// ── REMINDERS ─────────────────────────────────────────────
+function scheduleReminder(entry) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!entry.dueDate || !entry.reminderTime) return;
+  const reminderDate = new Date(entry.dueDate + 'T' + entry.reminderTime);
+  const delay = reminderDate - new Date();
+  if (delay > 0) {
+    setTimeout(() => {
+      new Notification('📋 ' + entry.catIcon + ' ' + entry.catName, { body: entry.text });
+    }, delay);
+  }
+}
+function scheduleAllReminders() {
+  entries.forEach(e => { if (e.reminderTime && e.dueDate) scheduleReminder(e); });
+}
+
+// ── VOICE ─────────────────────────────────────────────────
+function toggleRecording() { isRecording ? stopRecording() : startRecording(); }
+
+function startRecording() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert('Spracherkennung nicht verfügbar.\nBitte Chrome benutzen.'); return; }
+  recognition = new SR();
+  recognition.lang = 'de-DE';
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.onresult = (e) => {
+    const t = e.results[e.results.length - 1][0].transcript;
+    const ta = document.getElementById('noteText');
+    ta.value += (ta.value ? ' ' : '') + t;
+  };
+  recognition.onerror = () => stopRecording();
+  recognition.onend = () => { if (isRecording) recognition.start(); };
+  recognition.start();
+  isRecording = true;
+  document.getElementById('micBtn').classList.add('recording');
+  document.getElementById('micBtn').textContent = '⏹ Stop';
+  document.getElementById('recordingBar').classList.add('active');
+}
+
+function stopRecording() {
+  if (recognition) recognition.stop();
+  isRecording = false;
+  document.getElementById('micBtn').classList.remove('recording');
+  document.getElementById('micBtn').textContent = '🎤 Mikro';
+  document.getElementById('recordingBar').classList.remove('active');
+}
+
+// ── CLAUDE AI INTEGRATION ─────────────────────────────────
+function openApiModal() {
+  const existing = localStorage.getItem('anthropic_api_key') || '';
+  document.getElementById('apiKeyInput').value = existing;
+  document.getElementById('apiModal').classList.add('open');
+}
+function closeApiModal() {
+  document.getElementById('apiModal').classList.remove('open');
+}
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key.startsWith('sk-')) { showToast('❌ Ungültiger Schlüssel'); return; }
+  localStorage.setItem('anthropic_api_key', key);
+  closeApiModal();
+  showToast('✅ API-Schlüssel gespeichert');
+}
+
+async function runClaude() {
+  const text = document.getElementById('noteText').value.trim();
+  if (!text) { showToast('⚠️ Zuerst Text eingeben'); return; }
+
+  const apiKey = localStorage.getItem('anthropic_api_key');
+  if (!apiKey) {
+    openApiModal();
+    return;
+  }
+
+  const btn = document.getElementById('aiBtn');
+  btn.classList.add('loading');
+  btn.textContent = '⏳ ...';
+
+  const catList = CATEGORIES.map((c, i) => `${i}: ${c.icon} ${c.name} (Unterpunkte: ${c.subs.length > 0 ? c.subs.join(', ') : 'keine'})`).join('\n');
+
+  const prompt = `Du bist ein Assistent für ein Arbeitstagebuch eines Bauleiters im Galabau-Bereich.
+
+Kategorien:
+${catList}
+
+Eingabe des Benutzers: "${text}"
+
+Analysiere den Text und bestimme:
+1. Die passende Kategorie (Nummer 0-4)
+2. Den passenden Unterpunkt (exakter Text aus der Liste, oder leer wenn keiner passt)
+3. Eine verbesserte, klare deutsche Formulierung der Notiz (max. 2 Sätze, professionell)
+
+Antworte NUR als JSON, kein Text davor oder danach:
+{"catIdx": <Zahl>, "subcat": "<Unterpunkt oder leer>", "text": "<verbesserte Notiz>"}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+
+    const raw = data.content[0].text.trim();
+    const parsed = JSON.parse(raw);
+
+    // Apply to form
+    const catIdx = Math.min(Math.max(parseInt(parsed.catIdx), 0), CATEGORIES.length - 1);
+    document.getElementById('catSelect').value = catIdx;
+    updateSubcats();
+    if (parsed.subcat) {
+      setTimeout(() => {
+        const subcatEl = document.getElementById('subcatSelect');
+        for (let opt of subcatEl.options) {
+          if (opt.value === parsed.subcat) { subcatEl.value = parsed.subcat; break; }
+        }
+      }, 50);
+    }
+    document.getElementById('noteText').value = parsed.text;
+
+    // Show preview
+    const cat = CATEGORIES[catIdx];
+    document.getElementById('aiPreviewText').textContent =
+      `${cat.icon} ${cat.name}${parsed.subcat ? ' → ' + parsed.subcat : ''}: ${parsed.text}`;
+    document.getElementById('aiPreview').classList.add('visible');
+
+    showToast('🤖 Claude hat die Notiz kategorisiert');
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Fehler: ' + e.message.slice(0, 50));
+  }
+
+  btn.classList.remove('loading');
+  btn.textContent = '🤖 Claude';
+}
+
+function resetForm() {
+  document.getElementById('noteText').value = '';
+  document.getElementById('dateInput').value = todayStr;
+  document.getElementById('reminderCheck').checked = false;
+  document.getElementById('reminderTime').classList.remove('visible');
+  document.getElementById('reminderTime').value = '';
+  document.getElementById('aiPreview').classList.remove('visible');
+  document.getElementById('aiPreviewText').textContent = '';
+}
+
+init();
+</script>
+</body>
+</html>
