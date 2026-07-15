@@ -1,919 +1,614 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1a1d27">
-<title>Arbeitstagebuch</title>
-<link rel="manifest" href="/manifest.json">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Kontrolle Route — Spielplätze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  :root{
+    --ink:#1B2420;
+    --paper:#F1F3EC;
+    --paper-2:#E7EAE0;
+    --pine:#2F5D50;
+    --pine-dark:#20423A;
+    --amber:#C97A2E;
+    --amber-soft:#F1DDC0;
+    --slate:#6B7570;
+    --line:#CDD3C6;
+    --white:#FFFFFF;
+    --danger:#B34B3C;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:40px;
+  }
+  h1,h2,h3,.display{
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    letter-spacing:-0.01em;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
 
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface2: #22263a;
-    --border: #2e3350;
-    --accent: #4f7cff;
-    --text: #e8eaf0;
-    --text-muted: #7a809e;
-    --green: #06d6a0;
-    --orange: #f4a261;
-    --red: #ef476f;
-    --yellow: #ffd166;
+  /* ---------- Header / Signature element ---------- */
+  header.top{
+    padding:22px 18px 18px;
+    background:var(--pine);
+    color:var(--paper);
+    border-radius:0 0 22px 22px;
+    position:relative;
+    overflow:hidden;
+  }
+  header.top::after{
+    content:"";
+    position:absolute;
+    right:-40px; top:-40px;
+    width:160px;height:160px;
+    border:2px dashed rgba(241,243,236,0.18);
+    border-radius:50%;
+  }
+  .eyebrow{
+    text-transform:uppercase;
+    font-size:11px;
+    letter-spacing:0.14em;
+    color:var(--amber-soft);
+    margin:0 0 6px;
+    font-weight:600;
+  }
+  .title-row{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+  }
+  .title-row h1{
+    font-size:22px; margin:0; font-weight:700;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-
-  .header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+  .progress-wrap{
+    display:flex; align-items:center; gap:16px; margin-top:18px;
   }
-  .header-title { font-size: 18px; font-weight: 600; }
-  .header-right { display: flex; align-items: center; gap: 8px; }
-  .header-date { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-muted); }
-
-  .export-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    padding: 6px 10px;
-    border-radius: 8px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
+  .ring{ position:relative; width:76px; height:76px; flex:none; }
+  .ring svg{ transform:rotate(-90deg); }
+  .ring-track{ stroke:rgba(241,243,236,0.18); fill:none; stroke-width:8; }
+  .ring-fill{ stroke:var(--amber-soft); fill:none; stroke-width:8; stroke-linecap:round; transition:stroke-dashoffset .5s ease; }
+  .ring-label{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600;
   }
-  .export-btn:hover { border-color: var(--green); color: var(--green); }
+  .progress-text{ font-size:13px; color:rgba(241,243,236,0.85); line-height:1.5; }
+  .progress-text b{ color:var(--white); font-size:15px; }
 
-  .tabs {
-    display: flex;
-    gap: 4px;
-    padding: 12px 16px;
-    overflow-x: auto;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    scrollbar-width: none;
+  /* ---------- Layout ---------- */
+  main{ padding:16px 16px 0; max-width:640px; margin:0 auto; }
+
+  .card{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:14px;
   }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab {
-    flex-shrink: 0;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text-muted);
-    transition: all 0.2s;
-    white-space: nowrap;
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:none; border-radius:10px;
+    padding:13px 18px;
+    font-family:'Inter',sans-serif;
+    font-weight:600; font-size:15px;
+    cursor:pointer;
+    width:100%;
+    transition:transform .08s ease, opacity .15s ease;
   }
-  .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .btn:active{ transform:scale(0.98); }
+  .btn-primary{ background:var(--pine); color:var(--white); }
+  .btn-amber{ background:var(--amber); color:var(--white); }
+  .btn-outline{ background:transparent; color:var(--pine); border:1.5px solid var(--pine); }
+  .btn-ghost{ background:var(--paper-2); color:var(--ink); }
+  .btn-sm{ padding:9px 12px; font-size:13px; width:auto; }
+  .btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .btn-row{ display:flex; gap:10px; }
+  .btn-row .btn{ width:auto; flex:1; }
 
-  .main { padding: 16px; max-width: 600px; margin: 0 auto; }
-
-  /* TOAST */
-  .toast {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%) translateY(80px);
-    background: var(--surface);
-    border: 1px solid var(--green);
-    color: var(--green);
-    padding: 10px 20px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 500;
-    z-index: 999;
-    transition: transform 0.3s ease;
-    white-space: nowrap;
+  h2.section-title{
+    font-size:13px; text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--slate); margin:0 0 12px; font-weight:600;
   }
-  .toast.show { transform: translateX(-50%) translateY(0); }
 
-  /* TODAY BANNER */
-  .today-banner {
-    background: linear-gradient(135deg, rgba(79,124,255,0.15), rgba(6,214,160,0.08));
-    border: 1px solid rgba(79,124,255,0.3);
-    border-radius: 16px;
-    padding: 14px 16px;
-    margin-bottom: 20px;
+  /* ---------- Nearby list ---------- */
+  .stop-item{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:12px;
+    margin-bottom:10px;
+    display:flex; flex-direction:column; gap:8px;
   }
-  .today-banner-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .today-banner-title { font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: 0.5px; }
-  .today-banner-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); background: var(--surface2); padding: 2px 8px; border-radius: 10px; }
-  .today-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-  .today-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .today-item-cat { font-size: 11px; padding: 2px 6px; border-radius: 5px; flex-shrink: 0; font-weight: 600; }
-  .today-item-text { color: var(--text); line-height: 1.4; flex: 1; }
-  .today-empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 8px 0; }
-
-  /* FORM */
-  .new-entry-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 16px;
-    margin-bottom: 20px;
-    transition: border-color 0.3s;
+  .stop-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .stop-addr{ font-size:14.5px; font-weight:600; line-height:1.35; }
+  .stop-dist{
+    font-family:'IBM Plex Mono',monospace; font-size:12px;
+    background:var(--paper-2); color:var(--pine-dark);
+    padding:3px 8px; border-radius:20px; white-space:nowrap; flex:none;
   }
-  .card-label { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; }
-
-  .select-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-  select {
-    flex: 1;
-    min-width: 140px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 10px 12px;
-    border-radius: 10px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    outline: none;
-    cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a809e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 32px;
+  .stop-badge{
+    font-size:10.5px; color:var(--amber); font-weight:600; text-transform:uppercase;
+    letter-spacing:0.04em;
   }
-  select:focus { border-color: var(--accent); }
 
-  .date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-  .date-label { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
-  input[type="date"] { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; color-scheme: dark; }
-  input[type="date"]:focus { border-color: var(--accent); }
-  .date-clear { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
-  .date-clear:hover { border-color: var(--red); color: var(--red); }
-
-  .reminder-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-  .reminder-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-muted); user-select: none; }
-  .reminder-toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
-  input[type="time"] { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 10px; font-family: 'DM Mono', monospace; font-size: 14px; outline: none; color-scheme: dark; display: none; }
-  input[type="time"].visible { display: block; }
-  input[type="time"]:focus { border-color: var(--accent); }
-
-  .text-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; resize: none; min-height: 80px; outline: none; transition: border-color 0.2s; margin-bottom: 12px; }
-  .text-input:focus { border-color: var(--accent); }
-  .text-input::placeholder { color: var(--text-muted); }
-
-  .recording-bar { display: none; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(239,71,111,0.1); border: 1px solid var(--red); border-radius: 8px; margin-bottom: 12px; font-size: 13px; color: var(--red); }
-  .recording-bar.active { display: flex; }
-  .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: pulse 1s infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
-
-  .action-row { display: flex; gap: 8px; }
-  .btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
-  .btn-mic { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
-  .btn-mic:hover { border-color: var(--red); color: var(--red); }
-  .btn-mic.recording { background: var(--red); color: white; border-color: var(--red); }
-  .btn-save { background: var(--accent); color: white; flex: 2; }
-  .btn-save:hover { opacity: 0.85; }
-  .btn-cancel { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
-  .btn-cancel:hover { border-color: var(--red); color: var(--red); }
-
-  /* ENTRIES */
-  .entries-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .entries-title { font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.5px; }
-  .entries-count { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-muted); background: var(--surface2); padding: 2px 8px; border-radius: 10px; }
-
-  .entry { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; animation: slideIn 0.3s ease; transition: border-color 0.2s; }
-  .entry:hover { border-color: var(--accent); }
-  @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-  .entry-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-  .entry-cat { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
-  .entry-subcat { font-size: 11px; color: var(--text-muted); padding: 3px 8px; border-radius: 6px; background: var(--surface2); }
-  .entry-due { font-family: 'DM Mono', monospace; font-size: 11px; padding: 3px 8px; border-radius: 6px; background: rgba(255,209,102,0.12); color: var(--yellow); }
-  .entry-due.today { background: rgba(6,214,160,0.12); color: var(--green); }
-  .entry-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); margin-left: auto; }
-  .entry-reminder-badge { font-size: 11px; color: var(--orange); }
-  .entry-text { font-size: 14px; line-height: 1.5; }
-  .entry-footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
-  .btn-edit { background: none; border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 6px; transition: all 0.2s; }
-  .btn-edit:hover { border-color: var(--orange); color: var(--orange); }
-  .btn-delete { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 6px; transition: all 0.2s; }
-  .btn-delete:hover { color: var(--red); background: rgba(239,71,111,0.1); }
-  .btn-done { background: none; border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 6px; transition: all 0.2s; }
-  .btn-done:hover { border-color: var(--green); color: var(--green); }
-  .entry.done { opacity: 0.5; border-color: var(--green) !important; }
-  .entry.done .entry-text { text-decoration: line-through; color: var(--text-muted); }
-  .done-badge { font-size: 11px; color: var(--green); font-weight: 600; }
-
-  .empty { text-align: center; padding: 48px 20px; color: var(--text-muted); }
-  .empty-icon { font-size: 40px; margin-bottom: 12px; }
-  .empty-text { font-size: 14px; }
-
-  .cat-0 { background: rgba(79,124,255,0.15); color: #4f7cff; }
-  .cat-1 { background: rgba(6,214,160,0.15); color: #06d6a0; }
-  .cat-2 { background: rgba(244,162,97,0.15); color: #f4a261; }
-  .cat-3 { background: rgba(255,209,102,0.15); color: #ffd166; }
-  .cat-4 { background: rgba(239,71,111,0.15); color: #ef476f; }
-
-  /* IMPORT hidden input */
-  #importInput { display: none; }
-
-  /* CLAUDE AI BUTTON */
-  .btn-ai { background: linear-gradient(135deg, #4f7cff, #7c4fff); color: white; border: none; }
-  .btn-ai:hover { opacity: 0.85; }
-  .btn-ai.loading { opacity: 0.6; cursor: not-allowed; }
-
-  /* API KEY MODAL */
-  .modal-overlay {
-    display: none;
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.7);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
+  .empty-state{
+    text-align:center; padding:26px 12px; color:var(--slate); font-size:14px;
   }
-  .modal-overlay.open { display: flex; }
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 24px;
-    width: 100%;
-    max-width: 420px;
-  }
-  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
-  .modal-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5; }
-  .modal-input {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 12px;
-    border-radius: 10px;
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    outline: none;
-    margin-bottom: 12px;
-  }
-  .modal-input:focus { border-color: var(--accent); }
-  .modal-btns { display: flex; gap: 8px; }
-  .modal-save { flex: 2; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
-  .modal-cancel { flex: 1; padding: 12px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 10px; font-size: 14px; cursor: pointer; }
+  .empty-state .big{ font-size:34px; margin-bottom:6px; }
 
-  /* AI RESULT PREVIEW */
-  .ai-preview {
-    display: none;
-    background: rgba(79,124,255,0.08);
-    border: 1px solid rgba(79,124,255,0.3);
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 12px;
-    font-size: 13px;
-    line-height: 1.5;
+  select, input[type=text]{
+    width:100%; padding:10px 12px; border:1.5px solid var(--line); border-radius:10px;
+    font-size:14px; font-family:inherit; background:var(--paper);
   }
-  .ai-preview.visible { display: block; }
-  .ai-preview-label { font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.5px; margin-bottom: 6px; }
+
+  .status-line{ font-size:13px; color:var(--slate); margin-top:10px; text-align:center; }
+  .status-line.error{ color:var(--danger); }
+
+  /* full list */
+  .full-list-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 0; border-bottom:1px solid var(--line); gap:10px;
+  }
+  .full-list-item:last-child{ border-bottom:none; }
+  .full-list-addr{ font-size:13.5px; line-height:1.3; }
+  .dot{ width:9px;height:9px;border-radius:50%; flex:none; }
+  .dot.done{ background:var(--pine); }
+  .dot.pending{ background:var(--amber-soft); border:1.5px solid var(--amber); }
+  .fl-left{ display:flex; align-items:center; gap:10px; }
+  .fl-date{ font-size:11px; color:var(--slate); font-family:'IBM Plex Mono',monospace; }
+
+  /* modal-ish report panel */
+  .report-box{
+    background:var(--paper-2);
+    border-radius:10px; padding:12px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px; line-height:1.7;
+    white-space:pre-wrap;
+    max-height:340px; overflow-y:auto;
+    margin-bottom:12px;
+  }
+
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:var(--white); padding:10px 18px;
+    border-radius:24px; font-size:13.5px;
+    opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+    z-index:50;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(-6px); }
+
+  .tabs{ display:flex; gap:6px; margin-bottom:14px; }
+  .tab{
+    flex:1; text-align:center; padding:9px 6px; border-radius:10px;
+    font-size:13px; font-weight:600; color:var(--slate); background:var(--paper-2);
+    cursor:pointer; border:1.5px solid transparent;
+  }
+  .tab.active{ background:var(--pine); color:var(--white); }
+
+  .celebrate{
+    text-align:center; padding:20px 10px;
+  }
+  .celebrate .big{ font-size:40px; }
+  .celebrate h3{ margin:8px 0 4px; }
+  .celebrate p{ color:var(--slate); font-size:13.5px; margin:0 0 16px; }
+
+  .footnote{ font-size:11.5px; color:var(--slate); text-align:center; margin:18px 0 0; line-height:1.5; }
 </style>
 </head>
 <body>
+
+<header class="top">
+  <div class="eyebrow">VBW · Kontrolle</div>
+  <div class="title-row">
+    <h1>Spielplätze</h1>
+  </div>
+  <div class="progress-wrap">
+    <div class="ring">
+      <svg width="76" height="76" viewBox="0 0 76 76">
+        <circle class="ring-track" cx="38" cy="38" r="32"></circle>
+        <circle id="ringFill" class="ring-fill" cx="38" cy="38" r="32" stroke-dasharray="201" stroke-dashoffset="201"></circle>
+      </svg>
+      <div class="ring-label mono" id="ringLabel">0%</div>
+    </div>
+    <div class="progress-text">
+      <b id="progressCount">0 из 141</b><br>
+      проверено в этом цикле
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="nearby">Что рядом</div>
+    <div class="tab" data-tab="list">Все точки</div>
+    <div class="tab" data-tab="report">Отчёт</div>
+  </div>
+
+  <!-- NEARBY TAB -->
+  <div id="tab-nearby">
+    <div class="card">
+      <button class="btn btn-primary" id="locateBtn">📍 Найти ближайшие точки</button>
+      <div class="status-line" id="locateStatus"></div>
+    </div>
+    <div id="nearbyResults"></div>
+  </div>
+
+  <!-- LIST TAB -->
+  <div id="tab-list" style="display:none;">
+    <div class="card">
+      <h2 class="section-title">Все площадки (141)</h2>
+      <input type="text" id="searchBox" placeholder="Поиск по адресу…" style="margin-bottom:12px;">
+      <div id="fullList"></div>
+    </div>
+  </div>
+
+  <!-- REPORT TAB -->
+  <div id="tab-report" style="display:none;">
+    <div class="card" id="cycleCompleteCard" style="display:none;">
+      <div class="celebrate">
+        <div class="big">🎉</div>
+        <h3>Цикл завершён!</h3>
+        <p>Все 141 площадка проверена. Можно посмотреть итоговый отчёт или начать новый цикл.</p>
+        <div class="btn-row">
+          <button class="btn btn-outline btn-sm" id="showFinalReportBtn" style="width:100%;">Показать отчёт</button>
+        </div>
+        <div style="height:8px;"></div>
+        <button class="btn btn-amber" id="newCycleBtn">Начать новый цикл</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Промежуточный отчёт</h2>
+      <p style="font-size:13px; color:var(--slate); margin-top:0;">Срез по текущему циклу: что уже проверено и что осталось.</p>
+      <button class="btn btn-outline" id="interimReportBtn">Показать отчёт на сейчас</button>
+    </div>
+
+    <div class="card" id="reportOutputCard" style="display:none;">
+      <h2 class="section-title" id="reportOutputTitle">Отчёт</h2>
+      <div class="report-box" id="reportOutput"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-sm" id="copyReportBtn" style="width:100%;">📋 Копировать</button>
+        <button class="btn btn-ghost btn-sm" id="downloadReportBtn" style="width:100%;">⬇️ Скачать .txt</button>
+      </div>
+    </div>
+
+    <div class="card" id="historyCard" style="display:none;">
+      <h2 class="section-title">Прошлые циклы</h2>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <p class="footnote">Данные хранятся только на этом устройстве, в этом приложении.<br>Координаты 2 адресов приблизительные (центр почтового индекса) — помечены значком ~.</p>
+
+</main>
 
 <div class="toast" id="toast"></div>
 
-<!-- API KEY MODAL -->
-<div class="modal-overlay" id="apiModal">
-  <div class="modal">
-    <div class="modal-title">🔑 Claude API-Schlüssel</div>
-    <div class="modal-desc">Gib deinen Anthropic API-Schlüssel ein. Er wird nur in deinem Browser gespeichert und nirgendwo übertragen.</div>
-    <input class="modal-input" type="password" id="apiKeyInput" placeholder="sk-ant-api03-...">
-    <div class="modal-btns">
-      <button class="modal-save" onclick="saveApiKey()">Speichern</button>
-      <button class="modal-cancel" onclick="closeApiModal()">Abbrechen</button>
-    </div>
-  </div>
-</div>
-
-<div class="header">
-  <div class="header-title">📋 Arbeitstagebuch</div>
-  <div class="header-right">
-    <button class="export-btn" onclick="exportData()">⬇ Export</button>
-    <label class="export-btn" style="cursor:pointer">⬆ Import<input type="file" id="importInput" accept=".json" onchange="importData(event)"></label>
-    <button class="export-btn" onclick="exportPDF()" style="color:#ef476f;border-color:#2e3350">📄 PDF</button>
-    <div class="header-date" id="headerDate"></div>
-  </div>
-</div>
-
-<div class="tabs" id="tabsContainer"></div>
-
-<div class="main">
-  <div class="today-banner">
-    <div class="today-banner-header">
-      <div class="today-banner-title">📅 Heute fällig</div>
-      <div class="today-banner-count" id="todayCount">0</div>
-    </div>
-    <div id="todayList"></div>
-  </div>
-
-  <div class="new-entry-card" id="newEntryCard">
-    <div class="card-label" id="formLabel">Neue Notiz</div>
-    <div class="select-row">
-      <select id="catSelect" onchange="updateSubcats()"></select>
-      <select id="subcatSelect"><option value="">— kein Unterpunkt —</option></select>
-    </div>
-    <div class="date-row">
-      <span class="date-label">📅 Datum:</span>
-      <input type="date" id="dateInput">
-      <button class="date-clear" onclick="clearDate()">Kein</button>
-    </div>
-    <div class="reminder-row">
-      <label class="reminder-toggle">
-        <input type="checkbox" id="reminderCheck" onchange="toggleReminderTime()">
-        🔔 Erinnerung
-      </label>
-      <input type="time" id="reminderTime">
-    </div>
-    <div class="recording-bar" id="recordingBar">
-      <div class="rec-dot"></div>
-      <span>Aufnahme läuft...</span>
-    </div>
-    <textarea class="text-input" id="noteText" placeholder="Notiz eingeben oder Mikrofon benutzen..."></textarea>
-    <div class="ai-preview" id="aiPreview">
-      <div class="ai-preview-label">🤖 CLAUDE VORSCHLAG</div>
-      <div id="aiPreviewText"></div>
-    </div>
-    <div class="action-row">
-      <button class="btn btn-mic" id="micBtn" onclick="toggleRecording()">🎤 Mikro</button>
-      <button class="btn btn-ai" id="aiBtn" onclick="runClaude()">🤖 Claude</button>
-      <button class="btn btn-save" id="saveBtn" onclick="saveEntry()">✓ Speichern</button>
-      <button class="btn btn-cancel" id="cancelBtn" onclick="cancelEdit()" style="display:none">✕</button>
-    </div>
-  </div>
-
-  <div class="entries-header">
-    <div class="entries-title">ALLE NOTIZEN</div>
-    <div class="entries-count" id="entriesCount">0</div>
-  </div>
-  <div id="entriesList"></div>
-</div>
-
 <script>
-const CATEGORIES = [
-  { name: "Kurzfristige Fragen", icon: "❓", colorClass: "cat-4", subs: [] },
-  { name: "Aufgaben", icon: "📌", colorClass: "cat-0", subs: ["🔴 Dringend", "🟡 In Kürze", "🟢 Für die Zukunft"] },
-  { name: "LKW-Planung", icon: "🚛", colorClass: "cat-1", subs: ["🔴 Dringend", "🟡 In Kürze", "🟢 Für die Zukunft"] },
-  { name: "Fertigstellungspflege", icon: "🌿", colorClass: "cat-2", subs: ["📋 Anmelden", "📋 Abmelden", "⚠️ Beschwerden", "❓ Anfragen"] },
-  { name: "Kleine Aufträge", icon: "🔧", colorClass: "cat-3", subs: ["✅ Kann sofort gemacht werden", "📦 Ersatzteile — Bestellt", "🛒 Ersatzteile — Muss bestellt werden", "💶 Kann abgerechnet werden", "📅 Klärungstermin"] }
-];
+/* ============ DATA ============ */
+const PLAYGROUNDS = [{"address":"Blankensteiner Str. 20, 44797 Bochum","lat":51.4428035,"lon":7.1944432,"approx":false},{"address":"Am Langen Seil 122, 44799 Bochum","lat":51.4559754,"lon":7.2499809,"approx":false},{"address":"An der Landwehr 26, 44795 Bochum","lat":51.4661718,"lon":7.2032618,"approx":false},{"address":"An der Landwehr 45, 44795 Bochum","lat":51.4640102,"lon":7.2010693,"approx":false},{"address":"In der Uhlenflucht 8, 44795 Bochum","lat":51.4497558,"lon":7.1908876,"approx":false},{"address":"Junggesellenstr. 18, 44787 Bochum","lat":51.480723,"lon":7.2142035,"approx":false},{"address":"Knüwerweg 1, 44789 Bochum","lat":51.4733631,"lon":7.2229802,"approx":false},{"address":"Kulmer Str. 21, 44789 Bochum","lat":51.4658501,"lon":7.207174,"approx":false},{"address":"A.Stadion 1, 44791 Bochum","lat":51.4890092,"lon":7.2353256,"approx":false},{"address":"Blumenstr. 17, 44791 Bochum","lat":51.4836122,"lon":7.228276,"approx":false},{"address":"Castroper Str. 97, 44791 Bochum","lat":51.4870299,"lon":7.231153,"approx":false},{"address":"Grüner Weg 60, 44791 Bochum","lat":51.4892941,"lon":7.256841,"approx":false},{"address":"Havelstr. 2, 44791 Bochum","lat":51.4898243,"lon":7.2575745,"approx":false},{"address":"Havelstr. 45, 44791 Bochum","lat":51.4907661,"lon":7.260335,"approx":false},{"address":"Im Hole 26, 44791 Bochum","lat":51.4867089,"lon":7.2622324,"approx":false},{"address":"Matthias-Claudius-Str. 33, 44791 Bochum","lat":51.493942,"lon":7.2449006,"approx":false},{"address":"Rheinische Str. 7, 44791 Bochum","lat":51.4840161,"lon":7.2263131,"approx":false},{"address":"Stadionring 3, 44791 Bochum","lat":51.4886694,"lon":7.2333947,"approx":false},{"address":"Altenbochumer Str. 36, 44803 Bochum","lat":51.4755227,"lon":7.2392177,"approx":false},{"address":"Am Kreuzacker 13, 44803 Bochum","lat":51.4699604,"lon":7.2728505,"approx":false},{"address":"Am Kreuzacker 28, 44803 Bochum","lat":51.4707512,"lon":7.274595,"approx":false},{"address":"Bonhoefferstr. 111, 44803 Bochum","lat":51.4821355,"lon":7.2463158,"approx":false},{"address":"Goerdelerhof 25, 44803 Bochum","lat":51.4831142,"lon":7.248549,"approx":false},{"address":"Gorch-Fock-Str. 26, 44803 Bochum","lat":51.4738586,"lon":7.2753359,"approx":false},{"address":"Klausenersgrund 23, 44803 Bochum","lat":51.4716974,"lon":7.2603537,"approx":true},{"address":"Kreuzkamp 1, 44803 Bochum","lat":51.4746446,"lon":7.2481846,"approx":false},{"address":"Kreuzkamp 2, 44803 Bochum","lat":51.4748616,"lon":7.2476129,"approx":false},{"address":"Kreuzkamp 17, 44803 Bochum","lat":51.4741251,"lon":7.2494498,"approx":false},{"address":"Kreuzkamp 27, 44803 Bochum","lat":51.4735769,"lon":7.2504334,"approx":false},{"address":"Kreuzkamp 39, 44803 Bochum","lat":51.4731878,"lon":7.2514028,"approx":false},{"address":"Laerfeldstr. 53, 44803 Bochum","lat":51.4737365,"lon":7.2762261,"approx":false},{"address":"Laerfeldstr. 73, 44803 Bochum","lat":51.4759468,"lon":7.2757195,"approx":false},{"address":"Lindengraben 1, 44803 Bochum","lat":51.4741382,"lon":7.2447858,"approx":false},{"address":"Postkutschenweg 12, 44803 Bochum","lat":51.4709417,"lon":7.2515251,"approx":false},{"address":"Schulenburgstr. 24, 44803 Bochum","lat":51.4799922,"lon":7.2476102,"approx":false},{"address":"Stauffenberghöhe 3, 44803 Bochum","lat":51.4815088,"lon":7.2482814,"approx":false},{"address":"Stockyweg 1, 44803 Bochum","lat":51.473873,"lon":7.2430462,"approx":false},{"address":"Werner Hellweg 94, 44803 Bochum","lat":51.4742878,"lon":7.2726885,"approx":false},{"address":"Werner Hellweg 104, 44803 Bochum","lat":51.4743656,"lon":7.2734167,"approx":false},{"address":"Werner-Hellweg 118, 44803 Bochum","lat":51.4755126,"lon":7.2742169,"approx":false},{"address":"Dorstener Str. 135, 44809 Bochum","lat":51.4905234,"lon":7.2004938,"approx":false},{"address":"Richardstr. 11, 44809 Bochum","lat":51.4883859,"lon":7.2044553,"approx":false},{"address":"Seelandskamp 1, 44809 Bochum","lat":51.5096999,"lon":7.1964637,"approx":false},{"address":"Aggerstr. 55, 44807 Bochum","lat":51.5011485,"lon":7.2434476,"approx":false},{"address":"Aggerstr. 78, 44807 Bochum","lat":51.5016909,"lon":7.2444619,"approx":false},{"address":"Amselweg 11, 44807 Bochum","lat":51.4961957,"lon":7.236123,"approx":false},{"address":"Ederstr. 5, 44807 Bochum","lat":51.4968247,"lon":7.2512861,"approx":false},{"address":"Ederstr. 10, 44807 Bochum","lat":51.498149,"lon":7.2511215,"approx":false},{"address":"Ennepestr. 6, 44807 Bochum","lat":51.4987239,"lon":7.2441679,"approx":false},{"address":"Flottmannstr. 40, 44807 Bochum","lat":51.5200442,"lon":7.2173703,"approx":false},{"address":"Heckertstr. 99, 44807 Bochum","lat":51.4962498,"lon":7.2392847,"approx":false},{"address":"Hermeskamp 16, 44807 Bochum","lat":51.5047839,"lon":7.2215458,"approx":false},{"address":"Herner Str. 395, 44807 Bochum","lat":51.5121529,"lon":7.2095301,"approx":false},{"address":"Josephinenstr. 148, 44807 Bochum","lat":51.4983451,"lon":7.2391056,"approx":false},{"address":"Lahnstr., 44807 Bochum","lat":51.4980851,"lon":7.2525388,"approx":false},{"address":"Lerchenweg 16, 44807 Bochum","lat":51.4956631,"lon":7.2371986,"approx":false},{"address":"Vorm Grutthoff 21, 44807 Bochum","lat":51.5102041,"lon":7.2064939,"approx":false},{"address":"Werrastr. 6, 44807 Bochum","lat":51.4978498,"lon":7.2533268,"approx":false},{"address":"Am Nordbad 1, 44805 Bochum","lat":51.5043921,"lon":7.2631429,"approx":false},{"address":"Bauklohstr. 6, 44805 Bochum","lat":51.5212011,"lon":7.2666804,"approx":false},{"address":"Bergener Str. 237, 44805 Bochum","lat":51.5128372,"lon":7.253717,"approx":false},{"address":"Bergener Str. 251, 44805 Bochum","lat":51.5135578,"lon":7.2536015,"approx":false},{"address":"Bernsteinweg 2, 44805 Bochum","lat":51.507204,"lon":7.270753,"approx":false},{"address":"Fischerstr. 2a, 44805 Bochum","lat":51.521071,"lon":7.2849695,"approx":false},{"address":"Fischerstr. 55, 44805 Bochum","lat":51.523044,"lon":7.2903325,"approx":false},{"address":"Fischerstr. 63, 44805 Bochum","lat":51.5232785,"lon":7.2914674,"approx":false},{"address":"Fontanestr. 1, 44805 Bochum","lat":51.507689,"lon":7.2681413,"approx":false},{"address":"Händelstr. 9, 44805 Bochum","lat":51.5051647,"lon":7.2627771,"approx":false},{"address":"Händelstr. 44, 44805 Bochum","lat":51.50635,"lon":7.2661635,"approx":false},{"address":"Haydnstr. 8, 44805 Bochum","lat":51.5048439,"lon":7.2686391,"approx":false},{"address":"Haydnstr. 29, 44805 Bochum","lat":51.5053594,"lon":7.2708933,"approx":false},{"address":"Hiltroper Landwehr 45, 44805 Bochum","lat":51.5219505,"lon":7.2678474,"approx":false},{"address":"Kattenstr. 14, 44805 Bochum","lat":51.4979339,"lon":7.2858622,"approx":false},{"address":"Kattenstr. 30, 44805 Bochum","lat":51.4978892,"lon":7.2869925,"approx":false},{"address":"Kattenstr. 38, 44805 Bochum","lat":51.4977543,"lon":7.2874281,"approx":false},{"address":"Klüsener Str. 48, 44805 Bochum","lat":51.5208431,"lon":7.290117,"approx":false},{"address":"Klüsenerstr. 71, 44805 Bochum","lat":51.5218469,"lon":7.2898735,"approx":false},{"address":"Paul Müller Straße 27, 44805 Bochum","lat":51.5138868,"lon":7.2670213,"approx":false},{"address":"Rosenbergstr. 11, 44805 Bochum","lat":51.5053985,"lon":7.2659151,"approx":false},{"address":"Rosenbergstr. 22, 44805 Bochum","lat":51.5045074,"lon":7.264944,"approx":false},{"address":"Rosenbergstr. 32, 44805 Bochum","lat":51.5042812,"lon":7.2663176,"approx":false},{"address":"Schulte-Hiltrop-Str. 23, 44805 Bochum","lat":51.5145283,"lon":7.2641525,"approx":false},{"address":"Schürener Str. 1, 44805 Bochum","lat":51.5231861,"lon":7.2891905,"approx":false},{"address":"Winterkamp 5, 44805 Bochum","lat":51.5143386,"lon":7.2576239,"approx":false},{"address":"Alte Markstr. 39, 44801 Bochum","lat":51.4571714,"lon":7.253079,"approx":false},{"address":"Alte Markstr. 43, 44801 Bochum","lat":51.4568115,"lon":7.2527283,"approx":false},{"address":"Auf dem Backenberg 13, 44801 Bochum","lat":51.456813,"lon":7.2703506,"approx":false},{"address":"Auf dem Backenberg 5, 44801 Bochum","lat":51.4556003,"lon":7.2695763,"approx":false},{"address":"Hustadtring 45, 44801 Bochum","lat":51.4588091,"lon":7.271098,"approx":false},{"address":"Im Westenfeld 9A, 44801 Bochum","lat":51.4485723,"lon":7.267145,"approx":false},{"address":"Im Westenfeld 25, 44801 Bochum","lat":51.4497145,"lon":7.2657248,"approx":false},{"address":"Im Westenfeld 29, 44801 Bochum","lat":51.4493737,"lon":7.2647524,"approx":false},{"address":"Lennershofstr. 25, 44801 Bochum","lat":51.4481083,"lon":7.2665687,"approx":false},{"address":"Soldnerstr. 5, 44801 Bochum","lat":51.452054,"lon":7.2660169,"approx":false},{"address":"Soldnerstr. 10, 44801 Bochum","lat":51.4515325,"lon":7.2663734,"approx":false},{"address":"Uhlenbrinkstr. 2, 44801 Bochum","lat":51.4500655,"lon":7.2675041,"approx":false},{"address":"Zum Schebbruch, 44801 Bochum","lat":51.4490859,"lon":7.2658599,"approx":false},{"address":"Voedestraße 15, 44866 Bochum","lat":51.4814776,"lon":7.1362353,"approx":false},{"address":"Westenfelder Str. 202A, 44867 Bochum","lat":51.4648323,"lon":7.1503677,"approx":false},{"address":"Eschenhagen 7, 44869 Bochum","lat":51.4473914,"lon":7.159407,"approx":false},{"address":"Ginsterweg 29, 44869 Bochum","lat":51.4552258,"lon":7.1474609,"approx":false},{"address":"Ginsterweg 33, 44869 Bochum","lat":51.4554113,"lon":7.1480572,"approx":false},{"address":"Ginsterweg 52, 44869 Bochum","lat":51.4556835,"lon":7.1453402,"approx":false},{"address":"Holunderweg 2, 44869 Bochum","lat":51.4557447,"lon":7.1485303,"approx":false},{"address":"Kordts Feld 7, 44869 Bochum","lat":51.453121,"lon":7.1505762,"approx":false},{"address":"Preins Feld 14, 44869 Bochum","lat":51.4534473,"lon":7.1457752,"approx":false},{"address":"Pulverstr. 18u, 44869 Bochum","lat":51.4580835,"lon":7.1434542,"approx":false},{"address":"Schlehenweg 2, 44869 Bochum","lat":51.4525283,"lon":7.1450285,"approx":false},{"address":"Schlehenweg 22, 44869 Bochum","lat":51.4519411,"lon":7.1463593,"approx":false},{"address":"Telemannstr. 2, 44869 Bochum","lat":51.467405,"lon":7.1598434,"approx":false},{"address":"Telemannstr. 6, 44869 Bochum","lat":51.4669816,"lon":7.160312,"approx":false},{"address":"Dr-C-Otto-Straße 73, 44879 Bochum","lat":51.4246047,"lon":7.1505053,"approx":false},{"address":"Keilstr. 54A, 44879 Bochum","lat":51.4270214,"lon":7.1528339,"approx":false},{"address":"Birkhuhnweg 1, 44892 Bochum","lat":51.462679,"lon":7.3075133,"approx":false},{"address":"Breite Hille 42, 44892 Bochum","lat":51.4645267,"lon":7.3412466,"approx":false},{"address":"Egidestr. 1u, 44892 Bochum","lat":51.4676851,"lon":7.305544,"approx":false},{"address":"Grabelohstr. 204, 44892 Bochum","lat":51.4650088,"lon":7.3333976,"approx":false},{"address":"Hirschgraben 17, 44892 Bochum","lat":51.4636236,"lon":7.3047793,"approx":false},{"address":"Luchsweg 3, 44892 Bochum","lat":51.4625936,"lon":7.3102757,"approx":false},{"address":"Luchsweg 16, 44892 Bochum","lat":51.4619018,"lon":7.3087761,"approx":false},{"address":"Luchsweg 21, 44892 Bochum","lat":51.4617124,"lon":7.309988,"approx":false},{"address":"Marderweg 15, 44892 Bochum","lat":51.4713442,"lon":7.3130074,"approx":false},{"address":"Oberstr. 118, 44892 Bochum","lat":51.4773563,"lon":7.338758,"approx":false},{"address":"Sonnenleite 1, 44892 Bochum","lat":51.4632623,"lon":7.3014672,"approx":false},{"address":"Sonnenleite 2, 44892 Bochum","lat":51.4628365,"lon":7.30286,"approx":false},{"address":"Sonnenleite 20, 44892 Bochum","lat":51.4643222,"lon":7.3024743,"approx":false},{"address":"Sonnenleite 30, 44892 Bochum","lat":51.4653249,"lon":7.3016714,"approx":false},{"address":"Stockumer Str. 97, 44892 Bochum","lat":51.4665725,"lon":7.3346939,"approx":false},{"address":"Stockumer Str. 99, 44892 Bochum","lat":51.4662613,"lon":7.3353009,"approx":false},{"address":"Unterstr. 171, 44892 Bochum","lat":51.467123,"lon":7.3011343,"approx":false},{"address":"Auf dem Kiebast 6, 44894 Bochum","lat":51.48751,"lon":7.3095699,"approx":true},{"address":"Deutsches Reich 38, 44894 Bochum","lat":51.4941564,"lon":7.3055351,"approx":false},{"address":"Deutsches Reich 62, 44894 Bochum","lat":51.4932542,"lon":7.3071818,"approx":false},{"address":"Heinrich-Gustav-Str. 105, 44894 Bochum","lat":51.4849516,"lon":7.3068814,"approx":false},{"address":"Staudengarten 1, 44894 Bochum","lat":51.4864535,"lon":7.2907608,"approx":false},{"address":"Staudengarten 27, 44894 Bochum","lat":51.4861616,"lon":7.2887236,"approx":false},{"address":"Zum Kühl 37, 44894 Bochum","lat":51.4858871,"lon":7.3107352,"approx":false},{"address":"Zum Kühl 41, 44894 Bochum","lat":51.4859436,"lon":7.3113889,"approx":false},{"address":"Kurt-Schumacher-Str. 4, 58452 Witten","lat":51.4373548,"lon":7.339006,"approx":false},{"address":"Unterkrone 29, 58455 Witten","lat":51.4491468,"lon":7.3219425,"approx":false},{"address":"Unterkrone 37, 58455 Witten","lat":51.4501566,"lon":7.3219476,"approx":false}];
 
-let entries = [];
-let activeFilter = 'all';
-let recognition = null;
-let isRecording = false;
-let editingId = null;
-const todayStr = new Date().toISOString().split('T')[0];
+/* ============ STATE ============ */
+let state = {
+  status: {},       // address -> { done: bool, date: 'YYYY-MM-DD' }
+  cycleStarted: null,
+  history: []        // [{ completedDate, entries: [{address, date}] }]
+};
+let userPos = null;
 
-// ── IndexedDB ──────────────────────────────────────────────
-const DB_NAME = 'ArbeitstagebuchDB';
-const DB_VERSION = 1;
-const STORE = 'entries';
-let db;
+const STORAGE_KEY = 'kontrolle-route-state-v1';
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = e => {
-      const d = e.target.result;
-      if (!d.objectStoreNames.contains(STORE)) {
-        d.createObjectStore(STORE, { keyPath: 'id' });
-      }
-    };
-    req.onsuccess = e => { db = e.target.result; resolve(db); };
-    req.onerror = () => reject(req.error);
-  });
+function todayStr(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+function fmtDate(iso){
+  if(!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return `${d}.${m}.${y}`;
 }
 
-function dbGetAll() {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readonly');
-    const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () => resolve(req.result.sort((a,b) => b.id - a.id));
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function dbPut(entry) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const req = tx.objectStore(STORE).put(entry);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function dbDelete(id) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const req = tx.objectStore(STORE).delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function dbClear() {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const req = tx.objectStore(STORE).clear();
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-// ── INIT ──────────────────────────────────────────────────
-async function init() {
-  await openDB();
-  entries = await dbGetAll();
-
-  const now = new Date();
-  document.getElementById('headerDate').textContent =
-    now.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-  document.getElementById('dateInput').value = todayStr;
-
-  const catSelect = document.getElementById('catSelect');
-  CATEGORIES.forEach((cat, i) => {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = cat.icon + ' ' + cat.name;
-    catSelect.appendChild(opt);
-  });
-
-  updateSubcats();
-  buildTabs();
-  renderToday();
-  renderEntries();
-
-  if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
-  scheduleAllReminders();
-
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-  }
-}
-
-// ── FORM ──────────────────────────────────────────────────
-function updateSubcats() {
-  const catIdx = parseInt(document.getElementById('catSelect').value);
-  const subcatSelect = document.getElementById('subcatSelect');
-  subcatSelect.innerHTML = '<option value="">— kein Unterpunkt —</option>';
-  const cat = CATEGORIES[catIdx];
-  if (cat && cat.subs.length > 0) {
-    cat.subs.forEach(sub => {
-      const opt = document.createElement('option');
-      opt.value = sub; opt.textContent = sub;
-      subcatSelect.appendChild(opt);
-    });
-  }
-}
-
-function clearDate() { document.getElementById('dateInput').value = ''; }
-
-function toggleReminderTime() {
-  const checked = document.getElementById('reminderCheck').checked;
-  const t = document.getElementById('reminderTime');
-  if (checked) {
-    t.classList.add('visible');
-    const now = new Date(); now.setHours(now.getHours() + 1);
-    t.value = now.toTimeString().slice(0,5);
-  } else {
-    t.classList.remove('visible');
-    t.value = '';
-  }
-}
-
-function buildTabs() {
-  const container = document.getElementById('tabsContainer');
-  container.innerHTML = '';
-  const allTab = document.createElement('button');
-  allTab.className = 'tab' + (activeFilter === 'all' ? ' active' : '');
-  allTab.textContent = '📋 Alle';
-  allTab.onclick = () => { activeFilter = 'all'; buildTabs(); renderEntries(); };
-  container.appendChild(allTab);
-  CATEGORIES.forEach((cat, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'tab' + (activeFilter === i ? ' active' : '');
-    btn.textContent = cat.icon + ' ' + cat.name;
-    btn.onclick = () => { activeFilter = i; buildTabs(); renderEntries(); };
-    container.appendChild(btn);
-  });
-}
-
-function renderToday() {
-  const todayEntries = entries.filter(e => e.dueDate === todayStr);
-  document.getElementById('todayCount').textContent = todayEntries.length;
-  const list = document.getElementById('todayList');
-  if (todayEntries.length === 0) {
-    list.innerHTML = '<div class="today-empty">Keine Aufgaben für heute 🎉</div>';
-    return;
-  }
-  list.innerHTML = todayEntries.map(e => `
-    <div class="today-item">
-      <span class="today-item-cat ${e.catColor}">${e.catIcon}</span>
-      <span class="today-item-text"><strong>${e.catName}</strong>${e.subcat ? ' · ' + e.subcat : ''}<br>${e.text}</span>
-      ${e.reminderTime ? `<span style="font-size:12px;color:var(--orange)">🔔 ${e.reminderTime}</span>` : ''}
-    </div>`).join('');
-}
-
-async function saveEntry() {
-  const text = document.getElementById('noteText').value.trim();
-  if (!text) return;
-  const catIdx = parseInt(document.getElementById('catSelect').value);
-  const cat = CATEGORIES[catIdx];
-  const dueDate = document.getElementById('dateInput').value || null;
-  const reminderEnabled = document.getElementById('reminderCheck').checked;
-  const reminderTime = reminderEnabled ? document.getElementById('reminderTime').value : null;
-  const subcat = document.getElementById('subcatSelect').value;
-
-  if (editingId !== null) {
-    const idx = entries.findIndex(e => e.id === editingId);
-    if (idx !== -1) {
-      entries[idx] = { ...entries[idx], catIdx, catName: cat.name, catIcon: cat.icon, catColor: cat.colorClass, subcat, text, dueDate, reminderTime, editedAt: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) };
-      await dbPut(entries[idx]);
+async function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      state = Object.assign({status:{}, cycleStarted:null, history:[]}, parsed);
     }
-    editingId = null;
-    document.getElementById('formLabel').textContent = 'Neue Notiz';
-    document.getElementById('cancelBtn').style.display = 'none';
-    document.getElementById('saveBtn').textContent = '✓ Speichern';
-    document.getElementById('newEntryCard').style.borderColor = '';
-    showToast('✏️ Notiz aktualisiert');
-  } else {
-    const entry = {
-      id: Date.now(),
-      catIdx, catName: cat.name, catIcon: cat.icon, catColor: cat.colorClass,
-      subcat, text, dueDate, reminderTime,
-      createdAt: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-      createdDate: new Date().toLocaleDateString('de-DE')
-    };
-    entries.unshift(entry);
-    await dbPut(entry);
-    if (reminderTime && dueDate) scheduleReminder(entry);
-    showToast('✅ Gespeichert');
+  }catch(e){
+    console.log('No saved state yet, starting fresh.', e);
   }
-
-  resetForm();
-  renderToday();
-  renderEntries();
+  render();
 }
 
-function resetFormOld_DISABLED() {}
-
-function startEdit(id) {
-  const entry = entries.find(e => e.id === id);
-  if (!entry) return;
-  editingId = id;
-  document.getElementById('catSelect').value = entry.catIdx;
-  updateSubcats();
-  setTimeout(() => { document.getElementById('subcatSelect').value = entry.subcat || ''; }, 50);
-  document.getElementById('noteText').value = entry.text;
-  document.getElementById('dateInput').value = entry.dueDate || '';
-  if (entry.reminderTime) {
-    document.getElementById('reminderCheck').checked = true;
-    document.getElementById('reminderTime').value = entry.reminderTime;
-    document.getElementById('reminderTime').classList.add('visible');
+async function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    console.error('Save failed', e);
+    showToast('⚠️ Не удалось сохранить данные на устройстве');
   }
-  document.getElementById('formLabel').textContent = '✏️ Notiz bearbeiten';
-  document.getElementById('saveBtn').textContent = '✓ Aktualisieren';
-  document.getElementById('cancelBtn').style.display = 'flex';
-  document.getElementById('newEntryCard').style.borderColor = 'var(--orange)';
-  document.getElementById('newEntryCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function cancelEdit() {
-  editingId = null;
-  document.getElementById('formLabel').textContent = 'Neue Notiz';
-  document.getElementById('cancelBtn').style.display = 'none';
-  document.getElementById('saveBtn').textContent = '✓ Speichern';
-  document.getElementById('newEntryCard').style.borderColor = '';
-  resetForm();
+/* ============ HELPERS ============ */
+function haversine(lat1, lon1, lat2, lon2){
+  const R = 6371000;
+  const toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2-lat1);
+  const dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R*c;
 }
-
-async function deleteEntry(id) {
-  entries = entries.filter(e => e.id !== id);
-  await dbDelete(id);
-  renderToday();
-  renderEntries();
-  showToast('🗑 Gelöscht');
+function fmtDist(m){
+  if(m < 1000) return Math.round(m) + ' м';
+  return (m/1000).toFixed(1) + ' км';
 }
-
-function formatDueDate(dateStr) {
-  if (!dateStr) return null;
-  if (dateStr === todayStr) return 'Heute';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+function isDone(addr){
+  return !!(state.status[addr] && state.status[addr].done);
 }
-
-function renderEntries() {
-  const list = document.getElementById('entriesList');
-  const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.catIdx === activeFilter);
-  document.getElementById('entriesCount').textContent = filtered.length;
-  if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Noch keine Einträge</div></div>`;
-    return;
-  }
-  list.innerHTML = filtered.map(e => {
-    const due = formatDueDate(e.dueDate);
-    const isToday = e.dueDate === todayStr;
-    return `<div class="entry ${e.done ? 'done' : ''}">
-      <div class="entry-meta">
-        <span class="entry-cat ${e.catColor}">${e.catIcon} ${e.catName}</span>
-        ${e.subcat ? `<span class="entry-subcat">${e.subcat}</span>` : ''}
-        ${due ? `<span class="entry-due ${isToday ? 'today' : ''}">📅 ${due}</span>` : ''}
-        ${e.reminderTime ? `<span class="entry-reminder-badge">🔔 ${e.reminderTime}</span>` : ''}
-        ${e.done ? `<span class="done-badge">✓ Erledigt</span>` : ''}
-        <span class="entry-time">${e.createdDate} ${e.createdAt}${e.editedAt ? ' ✏️' : ''}</span>
-      </div>
-      <div class="entry-text">${e.text}</div>
-      <div class="entry-footer">
-        <button class="btn-done" onclick="toggleDone(${e.id})">${e.done ? '↩ Offen' : '✓ Erledigt'}</button>
-        <button class="btn-edit" onclick="startEdit(${e.id})">✏️ Bearbeiten</button>
-        <button class="btn-delete" onclick="deleteEntry(${e.id})">🗑 Löschen</button>
-      </div>
-    </div>`;
-  }).join('');
+function doneCount(){
+  return PLAYGROUNDS.filter(p => isDone(p.address)).length;
 }
-
-async function toggleDone(id) {
-  const idx = entries.findIndex(e => e.id === id);
-  if (idx === -1) return;
-  entries[idx].done = !entries[idx].done;
-  await dbPut(entries[idx]);
-  renderToday();
-  renderEntries();
-  showToast(entries[idx].done ? '✓ Erledigt' : '↩ Wieder offen');
-}
-
-// ── EXPORT / IMPORT ───────────────────────────────────────
-function exportData() {
-  const data = JSON.stringify(entries, null, 2);
-  const blob = new Blob([data], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'arbeitstagebuch_' + todayStr + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('⬇ Export erfolgreich');
-}
-
-async function importData(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const text = await file.text();
-  try {
-    const imported = JSON.parse(text);
-    if (!Array.isArray(imported)) throw new Error();
-    await dbClear();
-    entries = imported;
-    for (const e of entries) await dbPut(e);
-    renderToday();
-    renderEntries();
-    showToast('⬆ Import erfolgreich: ' + imported.length + ' Einträge');
-  } catch {
-    showToast('❌ Fehler beim Import');
-  }
-  event.target.value = '';
-}
-
-// ── TOAST ─────────────────────────────────────────────────
-function showToast(msg) {
+function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  setTimeout(()=> t.classList.remove('show'), 2200);
 }
 
-// ── PDF EXPORT ────────────────────────────────────────────
-function exportPDF() {
-  const now = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
-  const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.catIdx === activeFilter);
-
-  const rows = filtered.map(e => {
-    const due = e.dueDate ? (e.dueDate === todayStr ? 'Heute' : new Date(e.dueDate).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit'})) : '';
-    const status = e.done ? '✓' : '○';
-    return `<tr class="${e.done ? 'done-row' : ''}">
-      <td>${status}</td>
-      <td>${e.catIcon} ${e.catName}${e.subcat ? '<br><small>' + e.subcat + '</small>' : ''}</td>
-      <td>${e.text}</td>
-      <td>${due}</td>
-      <td>${e.reminderTime || ''}</td>
-      <td>${e.createdDate}<br><small>${e.createdAt}</small></td>
-    </tr>`;
-  }).join('');
-
-  const html = `<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Arbeitstagebuch — ${now}</title>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #222; margin: 20px; }
-  h1 { font-size: 18px; margin-bottom: 4px; }
-  .subtitle { color: #666; font-size: 12px; margin-bottom: 16px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #1a1d27; color: white; padding: 8px; text-align: left; font-size: 11px; }
-  td { padding: 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
-  tr:hover td { background: #f5f5f5; }
-  .done-row td { color: #999; text-decoration: line-through; }
-  small { color: #888; font-size: 10px; }
-  @media print { button { display: none; } }
-</style>
-</head>
-<body>
-<h1>📋 Arbeitstagebuch</h1>
-<div class="subtitle">Erstellt am ${now} · ${filtered.length} Einträge</div>
-<button onclick="window.print()" style="margin-bottom:12px;padding:8px 16px;background:#4f7cff;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨 Drucken / Als PDF speichern</button>
-<table>
-  <thead>
-    <tr>
-      <th>Status</th>
-      <th>Kategorie</th>
-      <th>Notiz</th>
-      <th>Datum</th>
-      <th>Erinnerung</th>
-      <th>Erstellt</th>
-    </tr>
-  </thead>
-  <tbody>${rows}</tbody>
-</table>
-</body>
-</html>`;
-
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('📄 PDF-Ansicht geöffnet');
+/* ============ RENDER: HEADER ============ */
+function renderProgress(){
+  const done = doneCount();
+  const total = PLAYGROUNDS.length;
+  const pct = Math.round((done/total)*100);
+  document.getElementById('progressCount').textContent = `${done} из ${total}`;
+  document.getElementById('ringLabel').textContent = pct + '%';
+  const circumference = 201;
+  const offset = circumference - (pct/100)*circumference;
+  document.getElementById('ringFill').style.strokeDashoffset = offset;
 }
 
-// ── REMINDERS ─────────────────────────────────────────────
-function scheduleReminder(entry) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  if (!entry.dueDate || !entry.reminderTime) return;
-  const reminderDate = new Date(entry.dueDate + 'T' + entry.reminderTime);
-  const delay = reminderDate - new Date();
-  if (delay > 0) {
-    setTimeout(() => {
-      new Notification('📋 ' + entry.catIcon + ' ' + entry.catName, { body: entry.text });
-    }, delay);
+/* ============ MARK DONE ============ */
+async function markDone(address){
+  state.status[address] = { done: true, date: todayStr() };
+  await saveState();
+  render();
+  showToast('✅ Отмечено: ' + address);
+  checkCycleComplete();
+}
+async function markUndone(address){
+  if(state.status[address]) state.status[address].done = false;
+  await saveState();
+  render();
+}
+
+function checkCycleComplete(){
+  if(doneCount() === PLAYGROUNDS.length){
+    document.getElementById('cycleCompleteCard').style.display = 'block';
   }
 }
-function scheduleAllReminders() {
-  entries.forEach(e => { if (e.reminderTime && e.dueDate) scheduleReminder(e); });
+
+/* ============ GOOGLE MAPS LINK ============ */
+function mapsUrl(p){
+  const dest = encodeURIComponent(p.address);
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
 }
 
-// ── VOICE ─────────────────────────────────────────────────
-function toggleRecording() { isRecording ? stopRecording() : startRecording(); }
+/* ============ NEARBY TAB ============ */
+document.getElementById('locateBtn').addEventListener('click', () => {
+  const statusEl = document.getElementById('locateStatus');
+  statusEl.textContent = 'Определяю местоположение…';
+  statusEl.classList.remove('error');
 
-function startRecording() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { alert('Spracherkennung nicht verfügbar.\nBitte Chrome benutzen.'); return; }
-  recognition = new SR();
-  recognition.lang = 'de-DE';
-  recognition.continuous = true;
-  recognition.interimResults = false;
-  recognition.onresult = (e) => {
-    const t = e.results[e.results.length - 1][0].transcript;
-    const ta = document.getElementById('noteText');
-    ta.value += (ta.value ? ' ' : '') + t;
-  };
-  recognition.onerror = () => stopRecording();
-  recognition.onend = () => { if (isRecording) recognition.start(); };
-  recognition.start();
-  isRecording = true;
-  document.getElementById('micBtn').classList.add('recording');
-  document.getElementById('micBtn').textContent = '⏹ Stop';
-  document.getElementById('recordingBar').classList.add('active');
-}
+  if(!window.isSecureContext){
+    statusEl.innerHTML = '⚠️ Браузер блокирует геолокацию для файла, открытого напрямую (не по https). Нужно разместить файл на сайте с https — см. подсказку внизу страницы.';
+    statusEl.classList.add('error');
+    return;
+  }
+  if(!navigator.geolocation){
+    statusEl.textContent = 'Геолокация не поддерживается этим браузером.';
+    statusEl.classList.add('error');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(pos => {
+    userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    statusEl.textContent = '📍 Местоположение найдено';
+    renderNearby();
+  }, err => {
+    if(err.code === 1){
+      statusEl.textContent = 'Доступ к геолокации запрещён. Разреши его в настройках браузера/сайта и попробуй снова.';
+    } else if(err.code === 2){
+      statusEl.textContent = 'Не удалось определить местоположение (нет сигнала GPS). Попробуй выйти на улицу или включить GPS.';
+    } else if(err.code === 3){
+      statusEl.textContent = 'Определение местоположения заняло слишком много времени. Попробуй ещё раз.';
+    } else {
+      statusEl.textContent = 'Не удалось определить местоположение.';
+    }
+    statusEl.classList.add('error');
+  }, { enableHighAccuracy:true, timeout:10000 });
+});
 
-function stopRecording() {
-  if (recognition) recognition.stop();
-  isRecording = false;
-  document.getElementById('micBtn').classList.remove('recording');
-  document.getElementById('micBtn').textContent = '🎤 Mikro';
-  document.getElementById('recordingBar').classList.remove('active');
-}
+function renderNearby(){
+  const container = document.getElementById('nearbyResults');
+  if(!userPos){
+    container.innerHTML = '';
+    return;
+  }
+  const remaining = PLAYGROUNDS
+    .filter(p => !isDone(p.address))
+    .map(p => ({ ...p, dist: haversine(userPos.lat, userPos.lon, p.lat, p.lon) }))
+    .sort((a,b) => a.dist - b.dist)
+    .slice(0, 15);
 
-// ── CLAUDE AI INTEGRATION ─────────────────────────────────
-function openApiModal() {
-  const existing = localStorage.getItem('anthropic_api_key') || '';
-  document.getElementById('apiKeyInput').value = existing;
-  document.getElementById('apiModal').classList.add('open');
-}
-function closeApiModal() {
-  document.getElementById('apiModal').classList.remove('open');
-}
-function saveApiKey() {
-  const key = document.getElementById('apiKeyInput').value.trim();
-  if (!key.startsWith('sk-')) { showToast('❌ Ungültiger Schlüssel'); return; }
-  localStorage.setItem('anthropic_api_key', key);
-  closeApiModal();
-  showToast('✅ API-Schlüssel gespeichert');
-}
-
-async function runClaude() {
-  const text = document.getElementById('noteText').value.trim();
-  if (!text) { showToast('⚠️ Zuerst Text eingeben'); return; }
-
-  const apiKey = localStorage.getItem('anthropic_api_key');
-  if (!apiKey) {
-    openApiModal();
+  if(remaining.length === 0){
+    container.innerHTML = `<div class="card"><div class="empty-state"><div class="big">🎉</div>Все точки в этом цикле проверены!</div></div>`;
     return;
   }
 
-  const btn = document.getElementById('aiBtn');
-  btn.classList.add('loading');
-  btn.textContent = '⏳ ...';
+  container.innerHTML = remaining.map(p => `
+    <div class="stop-item">
+      <div class="stop-top">
+        <div class="stop-addr">${p.address}${p.approx ? ' <span title="Приблизительные координаты">~</span>' : ''}</div>
+        <div class="stop-dist">${fmtDist(p.dist)}</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" style="width:100%;" onclick="window.open('${mapsUrl(p)}','_blank')">🧭 Маршрут</button>
+        <button class="btn btn-primary btn-sm" style="width:100%;" onclick="markDone('${p.address.replace(/'/g,"\\'")}')">✓ Готово</button>
+      </div>
+    </div>
+  `).join('');
+}
 
-  const catList = CATEGORIES.map((c, i) => `${i}: ${c.icon} ${c.name} (Unterpunkte: ${c.subs.length > 0 ? c.subs.join(', ') : 'keine'})`).join('\n');
+/* ============ FULL LIST TAB ============ */
+function renderFullList(filter=''){
+  const container = document.getElementById('fullList');
+  const f = filter.trim().toLowerCase();
+  const items = PLAYGROUNDS.filter(p => p.address.toLowerCase().includes(f));
+  container.innerHTML = items.map(p => {
+    const done = isDone(p.address);
+    const dateStr = done ? fmtDate(state.status[p.address].date) : '';
+    return `
+      <div class="full-list-item">
+        <div class="fl-left">
+          <div class="dot ${done?'done':'pending'}"></div>
+          <div class="full-list-addr">${p.address}${p.approx?' ~':''}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${done ? `<span class="fl-date">${dateStr}</span>` : ''}
+          <button class="btn ${done?'btn-ghost':'btn-primary'} btn-sm" onclick="${done ? `markUndone('${p.address.replace(/'/g,"\\'")}')` : `markDone('${p.address.replace(/'/g,"\\'")}')`}">${done?'Отменить':'Готово'}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+document.getElementById('searchBox').addEventListener('input', e => renderFullList(e.target.value));
 
-  const prompt = `Du bist ein Assistent für ein Arbeitstagebuch eines Bauleiters im Galabau-Bereich.
-
-Kategorien:
-${catList}
-
-Eingabe des Benutzers: "${text}"
-
-Analysiere den Text und bestimme:
-1. Die passende Kategorie (Nummer 0-4)
-2. Den passenden Unterpunkt (exakter Text aus der Liste, oder leer wenn keiner passt)
-3. Eine verbesserte, klare deutsche Formulierung der Notiz (max. 2 Sätze, professionell)
-
-Antworte NUR als JSON, kein Text davor oder danach:
-{"catIdx": <Zahl>, "subcat": "<Unterpunkt oder leer>", "text": "<verbesserte Notiz>"}`;
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }]
-      })
+/* ============ REPORTS ============ */
+function buildReport(kind){
+  const now = todayStr();
+  let lines = [];
+  if(kind === 'interim'){
+    const done = PLAYGROUNDS.filter(p => isDone(p.address));
+    const pending = PLAYGROUNDS.filter(p => !isDone(p.address));
+    lines.push(`Промежуточный отчёт — на ${fmtDate(now)}`);
+    lines.push(`Проверено: ${done.length} из ${PLAYGROUNDS.length}`);
+    lines.push('');
+    lines.push('ПРОВЕРЕНО:');
+    done.forEach((p,i) => lines.push(`${i+1}. ${p.address} — ${fmtDate(state.status[p.address].date)}`));
+    lines.push('');
+    lines.push('ОСТАЛОСЬ:');
+    pending.forEach((p,i) => lines.push(`${i+1}. ${p.address}`));
+  } else {
+    lines.push(`Отчёт по циклу — завершён ${fmtDate(now)}`);
+    lines.push('');
+    PLAYGROUNDS.forEach((p,i) => {
+      const rec = state.status[p.address];
+      lines.push(`${i+1}. ${p.address} — проверено ${rec ? fmtDate(rec.date) : '—'}`);
     });
-
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-
-    const raw = data.content[0].text.trim();
-    const parsed = JSON.parse(raw);
-
-    // Apply to form
-    const catIdx = Math.min(Math.max(parseInt(parsed.catIdx), 0), CATEGORIES.length - 1);
-    document.getElementById('catSelect').value = catIdx;
-    updateSubcats();
-    if (parsed.subcat) {
-      setTimeout(() => {
-        const subcatEl = document.getElementById('subcatSelect');
-        for (let opt of subcatEl.options) {
-          if (opt.value === parsed.subcat) { subcatEl.value = parsed.subcat; break; }
-        }
-      }, 50);
-    }
-    document.getElementById('noteText').value = parsed.text;
-
-    // Show preview
-    const cat = CATEGORIES[catIdx];
-    document.getElementById('aiPreviewText').textContent =
-      `${cat.icon} ${cat.name}${parsed.subcat ? ' → ' + parsed.subcat : ''}: ${parsed.text}`;
-    document.getElementById('aiPreview').classList.add('visible');
-
-    showToast('🤖 Claude hat die Notiz kategorisiert');
-  } catch (e) {
-    console.error(e);
-    showToast('❌ Fehler: ' + e.message.slice(0, 50));
   }
-
-  btn.classList.remove('loading');
-  btn.textContent = '🤖 Claude';
+  return lines.join('\n');
 }
 
-function resetForm() {
-  document.getElementById('noteText').value = '';
-  document.getElementById('dateInput').value = todayStr;
-  document.getElementById('reminderCheck').checked = false;
-  document.getElementById('reminderTime').classList.remove('visible');
-  document.getElementById('reminderTime').value = '';
-  document.getElementById('aiPreview').classList.remove('visible');
-  document.getElementById('aiPreviewText').textContent = '';
+let lastReportText = '';
+function showReport(kind){
+  lastReportText = buildReport(kind);
+  document.getElementById('reportOutputTitle').textContent = kind === 'interim' ? 'Промежуточный отчёт' : 'Итоговый отчёт цикла';
+  document.getElementById('reportOutput').textContent = lastReportText;
+  document.getElementById('reportOutputCard').style.display = 'block';
+  document.getElementById('reportOutputCard').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+document.getElementById('interimReportBtn').addEventListener('click', () => showReport('interim'));
+document.getElementById('showFinalReportBtn').addEventListener('click', () => showReport('final'));
+
+document.getElementById('copyReportBtn').addEventListener('click', async () => {
+  try{
+    await navigator.clipboard.writeText(lastReportText);
+    showToast('📋 Скопировано');
+  }catch(e){
+    showToast('Не удалось скопировать — выдели текст вручную');
+  }
+});
+document.getElementById('downloadReportBtn').addEventListener('click', () => {
+  const blob = new Blob([lastReportText], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `otchet-${todayStr()}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+/* ============ NEW CYCLE ============ */
+document.getElementById('newCycleBtn').addEventListener('click', async () => {
+  if(!confirm('Начать новый цикл? Текущие отметки сохранятся в истории, а статусы будут сброшены.')) return;
+  const entries = PLAYGROUNDS.map(p => ({ address: p.address, date: state.status[p.address] ? state.status[p.address].date : null }));
+  state.history.unshift({ completedDate: todayStr(), entries });
+  state.status = {};
+  state.cycleStarted = todayStr();
+  await saveState();
+  document.getElementById('cycleCompleteCard').style.display = 'none';
+  document.getElementById('reportOutputCard').style.display = 'none';
+  render();
+  showToast('🔄 Новый цикл начат');
+});
+
+function renderHistory(){
+  const card = document.getElementById('historyCard');
+  const list = document.getElementById('historyList');
+  if(!state.history || state.history.length === 0){
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+  list.innerHTML = state.history.map((h,idx) => `
+    <div class="full-list-item">
+      <div class="full-list-addr">Цикл завершён ${fmtDate(h.completedDate)}</div>
+      <button class="btn btn-ghost btn-sm" onclick="viewOldReport(${idx})">Открыть</button>
+    </div>
+  `).join('');
+}
+function viewOldReport(idx){
+  const h = state.history[idx];
+  const lines = [`Отчёт по циклу — завершён ${fmtDate(h.completedDate)}`, ''];
+  h.entries.forEach((e,i) => lines.push(`${i+1}. ${e.address} — проверено ${e.date ? fmtDate(e.date) : '—'}`));
+  lastReportText = lines.join('\n');
+  document.getElementById('reportOutputTitle').textContent = `Архив: цикл от ${fmtDate(h.completedDate)}`;
+  document.getElementById('reportOutput').textContent = lastReportText;
+  document.getElementById('reportOutputCard').style.display = 'block';
 }
 
-init();
+/* ============ TABS ============ */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    ['nearby','list','report'].forEach(name => {
+      document.getElementById('tab-'+name).style.display = (name === tab.dataset.tab) ? 'block' : 'none';
+    });
+    if(tab.dataset.tab === 'list') renderFullList(document.getElementById('searchBox').value);
+    if(tab.dataset.tab === 'report') renderHistory();
+  });
+});
+
+/* ============ MASTER RENDER ============ */
+function render(){
+  renderProgress();
+  renderNearby();
+  renderFullList(document.getElementById('searchBox').value);
+  renderHistory();
+  checkCycleComplete();
+}
+
+loadState();
 </script>
 </body>
 </html>
