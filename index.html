@@ -218,13 +218,27 @@
   .dot-legend.done{ background:var(--pine); }
   .dot-legend.pending{ background:var(--amber); }
   .leaflet-popup-content{ font-family:'Inter',sans-serif; font-size:13px; }
+  .num-marker-wrap{ background:transparent; border:none; }
+  .num-marker{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--pine); color:#fff; border:2px solid #fff;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:700;
+    box-shadow:0 1px 4px rgba(0,0,0,0.3);
+  }
+  .num-marker.highlight{
+    background:var(--amber); transform:scale(1.25);
+    box-shadow:0 0 0 4px rgba(201,122,46,0.35);
+  }
 
   /* ---------- Route sequence list ---------- */
   #routeSequence{ margin-top:14px; }
   .seq-item{
     display:flex; align-items:flex-start; gap:10px;
-    padding:8px 0;
+    padding:8px 0; cursor:pointer; border-radius:8px;
+    transition:background .15s ease;
   }
+  .seq-item:active{ background:var(--paper-2); }
   .seq-num{
     width:22px; height:22px; border-radius:50%; background:var(--pine); color:#fff;
     font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;
@@ -713,8 +727,13 @@ function renderMap(){
 
   const doneLatLngs = [];
   done.forEach((p, i) => {
-    const marker = L.circleMarker([p.lat, p.lon], {
-      radius:7, fillColor:'#2F5D50', color:'#fff', weight:2, fillOpacity:1
+    const marker = L.marker([p.lat, p.lon], {
+      icon: L.divIcon({
+        className: 'num-marker-wrap',
+        html: `<div class="num-marker">${i+1}</div>`,
+        iconSize: [26,26],
+        iconAnchor: [13,13]
+      })
     }).addTo(mapInstance);
     marker.bindPopup(`<b>${i+1}. ${p.address}</b><br>${fmtDateTime(p.date, p.time)}`);
     mapLayers.doneMarkers.push(marker);
@@ -770,7 +789,7 @@ function renderRouteSequence(done){
   let html = `<h2 class="section-title" style="margin-top:14px;">Порядок посещения (${done.length})</h2>`;
   done.forEach((p, i) => {
     html += `
-      <div class="seq-item">
+      <div class="seq-item" onclick="focusMapPoint(${i})">
         <div class="seq-num">${i+1}</div>
         <div class="seq-body">
           <div class="seq-addr">${p.address}${p.approx ? ' ~' : ''}</div>
@@ -784,7 +803,26 @@ function renderRouteSequence(done){
   container.innerHTML = html;
 }
 
-/* ============ MASTER RENDER ============ */
+function focusMapPoint(index){
+  const marker = mapLayers.doneMarkers[index];
+  if(!marker || !mapInstance) return;
+
+  document.getElementById('mapContainer').scrollIntoView({ behavior:'smooth', block:'start' });
+
+  const latlng = marker.getLatLng();
+  mapInstance.setView(latlng, 17, { animate:true });
+  marker.openPopup();
+
+  // brief highlight pulse on the marker's number badge
+  const el = marker.getElement();
+  if(el){
+    const badge = el.querySelector('.num-marker');
+    if(badge){
+      badge.classList.add('highlight');
+      setTimeout(() => badge.classList.remove('highlight'), 1200);
+    }
+  }
+}
 function render(){
   renderProgress();
   renderNearby();
