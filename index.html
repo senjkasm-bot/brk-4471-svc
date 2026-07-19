@@ -218,6 +218,24 @@
   .dot-legend.done{ background:var(--pine); }
   .dot-legend.pending{ background:var(--amber); }
   .leaflet-popup-content{ font-family:'Inter',sans-serif; font-size:13px; }
+
+  /* ---------- Route sequence list ---------- */
+  #routeSequence{ margin-top:14px; }
+  .seq-item{
+    display:flex; align-items:flex-start; gap:10px;
+    padding:8px 0;
+  }
+  .seq-num{
+    width:22px; height:22px; border-radius:50%; background:var(--pine); color:#fff;
+    font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;
+    flex:none; font-family:'IBM Plex Mono',monospace;
+  }
+  .seq-body{ flex:1; }
+  .seq-addr{ font-size:13.5px; font-weight:600; line-height:1.3; }
+  .seq-time{ font-size:11.5px; color:var(--slate); font-family:'IBM Plex Mono',monospace; margin-top:1px; }
+  .seq-connector{
+    width:1px; background:var(--line); height:14px; margin-left:11px;
+  }
 </style>
 </head>
 <body>
@@ -270,6 +288,7 @@
       </div>
       <div id="mapContainer"></div>
       <div class="status-line" id="mapStatus"></div>
+      <div id="routeSequence"></div>
     </div>
   </div>
 
@@ -330,8 +349,9 @@ const PLAYGROUNDS = [{"address":"Blankensteiner Str. 20, 44797 Bochum","lat":51.
 
 /* ============ STATE ============ */
 let state = {
-  status: {},       // address -> { done: bool, date: 'YYYY-MM-DD' }
+  status: {},       // address -> { done: bool, date: 'YYYY-MM-DD', time: 'HH:MM', seq: number }
   cycleStarted: null,
+  nextSeq: 1,
   history: []        // [{ completedDate, entries: [{address, date}] }]
 };
 let userPos = null;
@@ -346,6 +366,13 @@ function fmtDate(iso){
   if(!iso) return '—';
   const [y,m,d] = iso.split('-');
   return `${d}.${m}.${y}`;
+}
+function fmtTime(hhmm){
+  return hhmm || '';
+}
+function fmtDateTime(dateIso, time){
+  const dateStr = fmtDate(dateIso);
+  return time ? `${dateStr}, ${time}` : dateStr;
 }
 
 async function loadState(){
@@ -411,7 +438,12 @@ function renderProgress(){
 
 /* ============ MARK DONE ============ */
 async function markDone(address){
-  state.status[address] = { done: true, date: todayStr() };
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  if(!state.nextSeq) state.nextSeq = 1;
+  state.status[address] = { done: true, date: todayStr(), time: `${hh}:${mm}`, seq: state.nextSeq };
+  state.nextSeq += 1;
   await saveState();
   render();
   showToast('✅ Отмечено: ' + address);
@@ -587,6 +619,7 @@ document.getElementById('newCycleBtn').addEventListener('click', async () => {
   const entries = PLAYGROUNDS.map(p => ({ address: p.address, date: state.status[p.address] ? state.status[p.address].date : null }));
   state.history.unshift({ completedDate: todayStr(), entries });
   state.status = {};
+  state.nextSeq = 1;
   state.cycleStarted = todayStr();
   await saveState();
   document.getElementById('cycleCompleteCard').style.display = 'none';
@@ -667,18 +700,23 @@ function renderMap(){
   statusEl.classList.remove('error');
   const bounds = [];
 
-  // Checked points, in the order they were checked (by date)
+  // Checked points, in the exact order they were checked (seq, then date+time as fallback)
   const done = PLAYGROUNDS
     .filter(p => isDone(p.address))
-    .map(p => ({ ...p, date: state.status[p.address].date }))
-    .sort((a,b) => a.date.localeCompare(b.date));
+    .map(p => ({ ...p, date: state.status[p.address].date, time: state.status[p.address].time, seq: state.status[p.address].seq }))
+    .sort((a,b) => {
+      if(a.seq != null && b.seq != null) return a.seq - b.seq;
+      const aKey = a.date + 'T' + (a.time || '00:00');
+      const bKey = b.date + 'T' + (b.time || '00:00');
+      return aKey.localeCompare(bKey);
+    });
 
   const doneLatLngs = [];
   done.forEach((p, i) => {
     const marker = L.circleMarker([p.lat, p.lon], {
       radius:7, fillColor:'#2F5D50', color:'#fff', weight:2, fillOpacity:1
     }).addTo(mapInstance);
-    marker.bindPopup(`<b>${i+1}. ${p.address}</b><br>${fmtDate(p.date)}`);
+    marker.bindPopup(`<b>${i+1}. ${p.address}</b><br>${fmtDateTime(p.date, p.time)}`);
     mapLayers.doneMarkers.push(marker);
     doneLatLngs.push([p.lat, p.lon]);
     bounds.push([p.lat, p.lon]);
@@ -719,6 +757,31 @@ function renderMap(){
     mapInstance.fitBounds(bounds, { padding:[30,30], maxZoom:15 });
   }
   setTimeout(() => mapInstance.invalidateSize(), 100);
+
+  renderRouteSequence(done);
+}
+
+function renderRouteSequence(done){
+  const container = document.getElementById('routeSequence');
+  if(!done || done.length === 0){
+    container.innerHTML = '';
+    return;
+  }
+  let html = `<h2 class="section-title" style="margin-top:14px;">Порядок посещения (${done.length})</h2>`;
+  done.forEach((p, i) => {
+    html += `
+      <div class="seq-item">
+        <div class="seq-num">${i+1}</div>
+        <div class="seq-body">
+          <div class="seq-addr">${p.address}${p.approx ? ' ~' : ''}</div>
+          <div class="seq-time">${fmtDateTime(p.date, p.time)}</div>
+        </div>
+      </div>`;
+    if(i < done.length - 1){
+      html += `<div class="seq-connector"></div>`;
+    }
+  });
+  container.innerHTML = html;
 }
 
 /* ============ MASTER RENDER ============ */
