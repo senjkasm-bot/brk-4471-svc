@@ -230,6 +230,7 @@
     background:var(--amber); transform:scale(1.25);
     box-shadow:0 0 0 4px rgba(201,122,46,0.35);
   }
+  .num-marker.amber{ background:var(--amber); }
 
   /* ---------- Route sequence list ---------- */
   #routeSequence{ margin-top:14px; }
@@ -289,6 +290,11 @@
       <button class="btn btn-primary" id="locateBtn">📍 Найти ближайшие точки</button>
       <div class="status-line" id="locateStatus"></div>
     </div>
+    <div class="card" id="optimizeCard" style="display:none;">
+      <button class="btn btn-amber" id="optimizeBtn">🧭 Построить оптимальный маршрут по всем точкам</button>
+      <div class="status-line" id="optimizeStatus"></div>
+    </div>
+    <div id="optimalResults"></div>
     <div id="nearbyResults"></div>
   </div>
 
@@ -298,7 +304,7 @@
       <div class="map-legend">
         <span><i class="dot-legend me"></i> Я</span>
         <span><i class="dot-legend done"></i> Проверено (по порядку)</span>
-        <span><i class="dot-legend pending"></i> Рядом, не проверено</span>
+        <span><i class="dot-legend pending"></i> Рядом / план маршрута</span>
       </div>
       <div id="mapContainer"></div>
       <div class="status-line" id="mapStatus"></div>
@@ -425,6 +431,61 @@ function fmtDist(m){
   if(m < 1000) return Math.round(m) + ' м';
   return (m/1000).toFixed(1) + ' км';
 }
+
+/* ============ ROUTE OPTIMIZATION (nearest-neighbor + 2-opt) ============ */
+function routeLength(start, route){
+  let total = 0;
+  let cur = start;
+  route.forEach(p => {
+    total += haversine(cur.lat, cur.lon, p.lat, p.lon);
+    cur = p;
+  });
+  return total;
+}
+function nearestNeighborRoute(start, points){
+  const remaining = points.slice();
+  const route = [];
+  let cur = start;
+  while(remaining.length){
+    let bestIdx = 0, bestDist = Infinity;
+    remaining.forEach((p, i) => {
+      const d = haversine(cur.lat, cur.lon, p.lat, p.lon);
+      if(d < bestDist){ bestDist = d; bestIdx = i; }
+    });
+    cur = remaining.splice(bestIdx, 1)[0];
+    route.push(cur);
+  }
+  return route;
+}
+function twoOptImprove(start, route){
+  let best = route.slice();
+  let bestLen = routeLength(start, best);
+  let improved = true;
+  let iterations = 0;
+  while(improved && iterations < 60){
+    improved = false;
+    iterations++;
+    for(let i = 0; i < best.length - 1; i++){
+      for(let j = i + 1; j < best.length; j++){
+        const candidate = best.slice(0, i).concat(best.slice(i, j+1).reverse(), best.slice(j+1));
+        const candLen = routeLength(start, candidate);
+        if(candLen < bestLen - 1){
+          best = candidate;
+          bestLen = candLen;
+          improved = true;
+        }
+      }
+    }
+  }
+  return best;
+}
+function computeOptimalRoute(start, points){
+  if(points.length <= 1) return points.slice();
+  const nn = nearestNeighborRoute(start, points);
+  // 2-opt is O(n^2) per pass; skip for very large sets to stay responsive
+  if(points.length <= 60) return twoOptImprove(start, nn);
+  return nn;
+}
 function isDone(addr){
   return !!(state.status[addr] && state.status[addr].done);
 }
@@ -462,6 +523,10 @@ async function markDone(address){
   render();
   showToast('✅ Отмечено: ' + address);
   checkCycleComplete();
+  if(optimalRoute){
+    optimalRoute = optimalRoute.filter(p => p.address !== address);
+    renderOptimalRoute();
+  }
   if(mapInstance && document.getElementById('tab-map').style.display !== 'none') renderMap();
 }
 async function markUndone(address){
@@ -502,6 +567,7 @@ document.getElementById('locateBtn').addEventListener('click', () => {
   navigator.geolocation.getCurrentPosition(pos => {
     userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
     statusEl.textContent = '📍 Местоположение найдено';
+    document.getElementById('optimizeCard').style.display = 'block';
     renderNearby();
   }, err => {
     if(err.code === 1){
@@ -546,6 +612,67 @@ function renderNearby(){
       </div>
     </div>
   `).join('');
+}
+
+/* ============ OPTIMAL ROUTE ============ */
+let optimalRoute = null; // array of PLAYGROUNDS entries in optimized visiting order
+
+document.getElementById('optimizeBtn').addEventListener('click', () => {
+  if(!userPos) return;
+  const statusEl = document.getElementById('optimizeStatus');
+  statusEl.textContent = 'Считаю оптимальный порядок обхода…';
+  statusEl.classList.remove('error');
+  // slight delay so the status message has a chance to paint before the (fast) computation
+  setTimeout(() => {
+    const remaining = PLAYGROUNDS.filter(p => !isDone(p.address));
+    if(remaining.length === 0){
+      statusEl.textContent = '';
+      optimalRoute = null;
+      document.getElementById('optimalResults').innerHTML = '';
+      return;
+    }
+    optimalRoute = computeOptimalRoute(userPos, remaining);
+    const totalDist = routeLength(userPos, optimalRoute);
+    statusEl.textContent = `Готово: ${optimalRoute.length} точек, общий путь ≈ ${fmtDist(totalDist)}`;
+    renderOptimalRoute();
+    if(mapInstance && document.getElementById('tab-map').style.display !== 'none') renderMap();
+  }, 30);
+});
+
+function renderOptimalRoute(){
+  const container = document.getElementById('optimalResults');
+  if(!optimalRoute || optimalRoute.length === 0){
+    container.innerHTML = '';
+    return;
+  }
+  let cur = userPos;
+  container.innerHTML = `<div class="card"><h2 class="section-title">Оптимальный порядок обхода (${optimalRoute.length})</h2>` +
+    optimalRoute.map((p, i) => {
+      const legDist = haversine(cur.lat, cur.lon, p.lat, p.lon);
+      cur = p;
+      return `
+        <div class="seq-item" style="cursor:default;">
+          <div class="seq-num">${i+1}</div>
+          <div class="seq-body">
+            <div class="seq-addr">${p.address}${p.approx ? ' ~' : ''}</div>
+            <div class="seq-time">+${fmtDist(legDist)} от предыдущей точки</div>
+            <div class="btn-row" style="margin-top:6px;">
+              <button class="btn btn-outline btn-sm" style="width:100%;" onclick="window.open('${mapsUrl(p)}','_blank')">🧭 Маршрут</button>
+              <button class="btn btn-primary btn-sm" style="width:100%;" onclick="markDoneFromOptimal('${p.address.replace(/'/g,"\\'")}')">✓ Готово</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('') + `</div>`;
+}
+
+async function markDoneFromOptimal(address){
+  await markDone(address);
+  // recompute the remaining optimal route from the current position
+  if(userPos){
+    const remaining = PLAYGROUNDS.filter(p => !isDone(p.address));
+    optimalRoute = remaining.length ? computeOptimalRoute(userPos, remaining) : null;
+    renderOptimalRoute();
+  }
 }
 
 /* ============ FULL LIST TAB ============ */
@@ -635,6 +762,9 @@ document.getElementById('newCycleBtn').addEventListener('click', async () => {
   state.status = {};
   state.nextSeq = 1;
   state.cycleStarted = todayStr();
+  optimalRoute = null;
+  document.getElementById('optimalResults').innerHTML = '';
+  document.getElementById('optimizeStatus').textContent = '';
   await saveState();
   document.getElementById('cycleCompleteCard').style.display = 'none';
   document.getElementById('reportOutputCard').style.display = 'none';
@@ -683,7 +813,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 /* ============ MAP ============ */
 let mapInstance = null;
-let mapLayers = { me:null, doneMarkers:[], donePolyline:null, pendingMarkers:[] };
+let mapLayers = { me:null, doneMarkers:[], donePolyline:null, pendingMarkers:[], optimalPolyline:null };
 
 function ensureMap(){
   if(!mapInstance){
@@ -700,10 +830,12 @@ function clearMapLayers(){
   mapLayers.doneMarkers.forEach(m => mapInstance.removeLayer(m));
   mapLayers.pendingMarkers.forEach(m => mapInstance.removeLayer(m));
   if(mapLayers.donePolyline) mapInstance.removeLayer(mapLayers.donePolyline);
+  if(mapLayers.optimalPolyline) mapInstance.removeLayer(mapLayers.optimalPolyline);
   if(mapLayers.me) mapInstance.removeLayer(mapLayers.me);
   mapLayers.doneMarkers = [];
   mapLayers.pendingMarkers = [];
   mapLayers.donePolyline = null;
+  mapLayers.optimalPolyline = null;
   mapLayers.me = null;
 }
 
@@ -748,19 +880,41 @@ function renderMap(){
 
   // Nearby unchecked points, if we know current position
   if(userPos){
-    const pending = PLAYGROUNDS
-      .filter(p => !isDone(p.address))
-      .map(p => ({ ...p, dist: haversine(userPos.lat, userPos.lon, p.lat, p.lon) }))
-      .sort((a,b) => a.dist - b.dist)
-      .slice(0, 15);
-    pending.forEach(p => {
-      const marker = L.circleMarker([p.lat, p.lon], {
-        radius:6, fillColor:'#C97A2E', color:'#fff', weight:2, fillOpacity:1
+    if(optimalRoute && optimalRoute.length){
+      // Show the computed optimal route: numbered amber markers + dashed line
+      const optLatLngs = [[userPos.lat, userPos.lon]];
+      optimalRoute.forEach((p, i) => {
+        const marker = L.marker([p.lat, p.lon], {
+          icon: L.divIcon({
+            className: 'num-marker-wrap',
+            html: `<div class="num-marker amber">${i+1}</div>`,
+            iconSize: [26,26],
+            iconAnchor: [13,13]
+          })
+        }).addTo(mapInstance);
+        marker.bindPopup(`<b>${i+1}. ${p.address}</b>`);
+        mapLayers.pendingMarkers.push(marker);
+        optLatLngs.push([p.lat, p.lon]);
+        bounds.push([p.lat, p.lon]);
+      });
+      mapLayers.optimalPolyline = L.polyline(optLatLngs, {
+        color:'#C97A2E', weight:3, opacity:0.8, dashArray:'2,8'
       }).addTo(mapInstance);
-      marker.bindPopup(`<b>${p.address}</b><br>${fmtDist(p.dist)}`);
-      mapLayers.pendingMarkers.push(marker);
-      bounds.push([p.lat, p.lon]);
-    });
+    } else {
+      const pending = PLAYGROUNDS
+        .filter(p => !isDone(p.address))
+        .map(p => ({ ...p, dist: haversine(userPos.lat, userPos.lon, p.lat, p.lon) }))
+        .sort((a,b) => a.dist - b.dist)
+        .slice(0, 15);
+      pending.forEach(p => {
+        const marker = L.circleMarker([p.lat, p.lon], {
+          radius:6, fillColor:'#C97A2E', color:'#fff', weight:2, fillOpacity:1
+        }).addTo(mapInstance);
+        marker.bindPopup(`<b>${p.address}</b><br>${fmtDist(p.dist)}`);
+        mapLayers.pendingMarkers.push(marker);
+        bounds.push([p.lat, p.lon]);
+      });
+    }
 
     const meMarker = L.circleMarker([userPos.lat, userPos.lon], {
       radius:8, fillColor:'#3182CE', color:'#fff', weight:3, fillOpacity:1
