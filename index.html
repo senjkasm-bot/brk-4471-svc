@@ -6,6 +6,8 @@
 <title>Kontrolle Route — Spielplätze</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
     --ink:#1B2420;
@@ -200,6 +202,22 @@
   .celebrate p{ color:var(--slate); font-size:13.5px; margin:0 0 16px; }
 
   .footnote{ font-size:11.5px; color:var(--slate); text-align:center; margin:18px 0 0; line-height:1.5; }
+
+  /* ---------- Map ---------- */
+  #mapContainer{
+    width:100%; height:420px; border-radius:10px; overflow:hidden;
+    border:1px solid var(--line); background:var(--paper-2);
+  }
+  .map-legend{
+    display:flex; flex-wrap:wrap; gap:14px; align-items:center;
+    font-size:12px; color:var(--slate); margin-bottom:10px; padding:0 2px;
+  }
+  .map-legend span{ display:flex; align-items:center; gap:6px; }
+  .dot-legend{ width:10px; height:10px; border-radius:50%; display:inline-block; flex:none; }
+  .dot-legend.me{ background:#3182CE; box-shadow:0 0 0 3px rgba(49,130,206,0.25); }
+  .dot-legend.done{ background:var(--pine); }
+  .dot-legend.pending{ background:var(--amber); }
+  .leaflet-popup-content{ font-family:'Inter',sans-serif; font-size:13px; }
 </style>
 </head>
 <body>
@@ -228,6 +246,7 @@
 
   <div class="tabs">
     <div class="tab active" data-tab="nearby">Что рядом</div>
+    <div class="tab" data-tab="map">Карта</div>
     <div class="tab" data-tab="list">Все точки</div>
     <div class="tab" data-tab="report">Отчёт</div>
   </div>
@@ -239,6 +258,19 @@
       <div class="status-line" id="locateStatus"></div>
     </div>
     <div id="nearbyResults"></div>
+  </div>
+
+  <!-- MAP TAB -->
+  <div id="tab-map" style="display:none;">
+    <div class="card" style="padding:12px;">
+      <div class="map-legend">
+        <span><i class="dot-legend me"></i> Я</span>
+        <span><i class="dot-legend done"></i> Проверено (по порядку)</span>
+        <span><i class="dot-legend pending"></i> Рядом, не проверено</span>
+      </div>
+      <div id="mapContainer"></div>
+      <div class="status-line" id="mapStatus"></div>
+    </div>
   </div>
 
   <!-- LIST TAB -->
@@ -384,11 +416,13 @@ async function markDone(address){
   render();
   showToast('✅ Отмечено: ' + address);
   checkCycleComplete();
+  if(mapInstance && document.getElementById('tab-map').style.display !== 'none') renderMap();
 }
 async function markUndone(address){
   if(state.status[address]) state.status[address].done = false;
   await saveState();
   render();
+  if(mapInstance && document.getElementById('tab-map').style.display !== 'none') renderMap();
 }
 
 function checkCycleComplete(){
@@ -591,13 +625,101 @@ document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    ['nearby','list','report'].forEach(name => {
+    ['nearby','map','list','report'].forEach(name => {
       document.getElementById('tab-'+name).style.display = (name === tab.dataset.tab) ? 'block' : 'none';
     });
     if(tab.dataset.tab === 'list') renderFullList(document.getElementById('searchBox').value);
     if(tab.dataset.tab === 'report') renderHistory();
+    if(tab.dataset.tab === 'map') renderMap();
   });
 });
+
+/* ============ MAP ============ */
+let mapInstance = null;
+let mapLayers = { me:null, doneMarkers:[], donePolyline:null, pendingMarkers:[] };
+
+function ensureMap(){
+  if(!mapInstance){
+    mapInstance = L.map('mapContainer', { zoomControl:true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapInstance);
+    mapInstance.setView([51.48, 7.22], 12);
+  }
+}
+
+function clearMapLayers(){
+  mapLayers.doneMarkers.forEach(m => mapInstance.removeLayer(m));
+  mapLayers.pendingMarkers.forEach(m => mapInstance.removeLayer(m));
+  if(mapLayers.donePolyline) mapInstance.removeLayer(mapLayers.donePolyline);
+  if(mapLayers.me) mapInstance.removeLayer(mapLayers.me);
+  mapLayers.doneMarkers = [];
+  mapLayers.pendingMarkers = [];
+  mapLayers.donePolyline = null;
+  mapLayers.me = null;
+}
+
+function renderMap(){
+  ensureMap();
+  clearMapLayers();
+  const statusEl = document.getElementById('mapStatus');
+  statusEl.classList.remove('error');
+  const bounds = [];
+
+  // Checked points, in the order they were checked (by date)
+  const done = PLAYGROUNDS
+    .filter(p => isDone(p.address))
+    .map(p => ({ ...p, date: state.status[p.address].date }))
+    .sort((a,b) => a.date.localeCompare(b.date));
+
+  const doneLatLngs = [];
+  done.forEach((p, i) => {
+    const marker = L.circleMarker([p.lat, p.lon], {
+      radius:7, fillColor:'#2F5D50', color:'#fff', weight:2, fillOpacity:1
+    }).addTo(mapInstance);
+    marker.bindPopup(`<b>${i+1}. ${p.address}</b><br>${fmtDate(p.date)}`);
+    mapLayers.doneMarkers.push(marker);
+    doneLatLngs.push([p.lat, p.lon]);
+    bounds.push([p.lat, p.lon]);
+  });
+  if(doneLatLngs.length > 1){
+    mapLayers.donePolyline = L.polyline(doneLatLngs, {
+      color:'#2F5D50', weight:3, opacity:0.7, dashArray:'6,6'
+    }).addTo(mapInstance);
+  }
+
+  // Nearby unchecked points, if we know current position
+  if(userPos){
+    const pending = PLAYGROUNDS
+      .filter(p => !isDone(p.address))
+      .map(p => ({ ...p, dist: haversine(userPos.lat, userPos.lon, p.lat, p.lon) }))
+      .sort((a,b) => a.dist - b.dist)
+      .slice(0, 15);
+    pending.forEach(p => {
+      const marker = L.circleMarker([p.lat, p.lon], {
+        radius:6, fillColor:'#C97A2E', color:'#fff', weight:2, fillOpacity:1
+      }).addTo(mapInstance);
+      marker.bindPopup(`<b>${p.address}</b><br>${fmtDist(p.dist)}`);
+      mapLayers.pendingMarkers.push(marker);
+      bounds.push([p.lat, p.lon]);
+    });
+
+    const meMarker = L.circleMarker([userPos.lat, userPos.lon], {
+      radius:8, fillColor:'#3182CE', color:'#fff', weight:3, fillOpacity:1
+    }).addTo(mapInstance);
+    meMarker.bindPopup('Я здесь');
+    mapLayers.me = meMarker;
+    bounds.push([userPos.lat, userPos.lon]);
+  } else {
+    statusEl.textContent = 'Чтобы видеть ближайшие непроверенные точки на карте, открой вкладку «Что рядом» и разреши геолокацию — тогда они появятся здесь тоже.';
+  }
+
+  if(bounds.length > 0){
+    mapInstance.fitBounds(bounds, { padding:[30,30], maxZoom:15 });
+  }
+  setTimeout(() => mapInstance.invalidateSize(), 100);
+}
 
 /* ============ MASTER RENDER ============ */
 function render(){
